@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 214 32% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 213 94% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 214 32% 93%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 214 32% 91%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 213 94% 38%;
+    --radius: 0.5rem;
+    --sidebar-bg: 222 47% 11%;
+    --sidebar-border: 217 33% 17%;
+  }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 213 31% 91%;
+    --card: 222 47% 11%;
+    --card-foreground: 213 31% 91%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 213 94% 58%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 213 31% 91%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 213 31% 91%;
+    --destructive: 0 63% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 20%;
+    --input: 217 33% 17%;
+    --ring: 213 94% 58%;
+    --sidebar-bg: 222 47% 6%;
+    --sidebar-border: 217 33% 14%;
+  }
+}
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans antialiased; }
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+
+/* table fixed layout */
+.rec-table { table-layout: auto; }
+.rec-table td, .rec-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Proposal column gets flexible width, others are fixed */
+.rec-table td.proposal-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+
+/* status badge colors */
+.status-done      { @apply bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400; }
+.status-inwork    { @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
+.status-rejected  { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+.status-nodata    { @apply bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400; }

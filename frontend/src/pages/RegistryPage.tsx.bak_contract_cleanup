@@ -1,0 +1,432 @@
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+interface Rec {
+  id: string;
+  seq_no?: string;
+  record_type_normalized?: string;
+  cycle?: string;
+  sphere_normalized?: string;
+  proposal_text?: string;
+  responsible_org?: string;
+  interested_orgs?: string;
+  completion_form?: string;
+  due_raw?: string;
+  status_normalized?: string;
+  position_2024_2025?: string;
+  position_2026?: string;
+  adgs_position?: string;
+  case_note?: string;
+  case_text?: string;
+}
+
+interface Filters {
+  cycles?: string[];
+  statuses?: string[];
+  spheres?: string[];
+  types?: string[];
+}
+
+interface PageResult {
+  total?: number;
+  page?: number;
+  pages?: number;
+  rows?: Rec[];
+}
+
+const ALL = "__all__";
+
+function normalizeLabel(value?: string) {
+  if (!value) return "";
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (!trimmed) return "";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+function uniqNormalized(values?: string[]) {
+  const map = new Map<string, string>();
+  for (const raw of values || []) {
+    const normalized = normalizeLabel(raw);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (!map.has(key)) map.set(key, normalized);
+  }
+  return Array.from(map.values());
+}
+
+function statusClass(status?: string) {
+  const s = (status || "").toLowerCase();
+  if (s.includes("исполн")) return "status status-done";
+  if (s.includes("работ")) return "status status-work";
+  if (s.includes("не поддерж") || s.includes("отклон")) return "status status-bad";
+  return "status status-neutral";
+}
+
+export default function RegistryPage() {
+  const [search, setSearch] = useState("");
+  const [cycle, setCycle] = useState(ALL);
+  const [status, setStatus] = useState(ALL);
+  const [sphere, setSphere] = useState(ALL);
+  const [type, setType] = useState(ALL);
+  const [page, setPage] = useState(1);
+
+  const [detailItem, setDetailItem] = useState<Rec | null>(null);
+  const [editItem, setEditItem] = useState<Rec | null>(null);
+  const [editStatus, setEditStatus] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editPosition, setEditPosition] = useState("");
+  const [editAdgs, setEditAdgs] = useState("");
+  const [editComment, setEditComment] = useState("");
+  const [editBy, setEditBy] = useState("");
+
+  const params = useMemo(() => {
+    const p = new URLSearchParams({
+      page: String(page),
+      pageSize: 100,
+    });
+
+    if (search) p.set("search", search);
+    if (cycle !== ALL) p.set("cycle", cycle);
+    if (status !== ALL) p.set("status", status);
+    if (sphere !== ALL) p.set("sphere", sphere);
+    if (type !== ALL) p.set("type", type);
+
+    return p.toString();
+  }, [page, search, cycle, status, sphere, type]);
+
+  const { data, isLoading, error } = useQuery<PageResult>({
+    queryKey: ["/api/recommendations", params],
+    queryFn: () => apiRequest("GET", `/api/recommendations?${params}`).then((r) => r.json()),
+  });
+
+  const { data: filters } = useQuery<Filters>({
+    queryKey: ["/api/recommendations/filters"],
+    queryFn: () => apiRequest("GET", "/api/recommendations/filters").then((r) => r.json()),
+  });
+
+  const rows = data?.items ?? data?.rows ?? [];
+  const total = data?.total ?? rows.length;
+  const currentPage = data?.page ?? 1;
+  const pageSize = 100;
+  const totalPages = data?.pages ?? 1;
+
+  const normalizedStatuses = uniqNormalized(filters?.statuses);
+  const normalizedTypes = uniqNormalized(filters?.types);
+  const normalizedSpheres = uniqNormalized(filters?.spheres);
+  const normalizedCycles = uniqNormalized(filters?.cycles);
+
+  const mutation = useMutation({
+    mutationFn: (payload: any) =>
+      apiRequest("PATCH", `/api/recommendations/${editItem?.id}/status`, payload).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+      setEditItem(null);
+    },
+  });
+
+  function reset() {
+    setSearch("");
+    setCycle(ALL);
+    setStatus(ALL);
+    setSphere(ALL);
+    setType(ALL);
+    setPage(1);
+  }
+
+  function openEdit(item: Rec) {
+    setEditItem(item);
+    setEditStatus(normalizeLabel(item.status_normalized) || "");
+    setEditDeadline(item.due_raw || "");
+    setEditPosition(item.position_2026 || "");
+    setEditAdgs(item.adgs_position || "");
+    setEditComment(item.case_note || "");
+    setEditBy("");
+  }
+
+  function saveEdit() {
+    if (!editItem) return;
+
+    mutation.mutate({
+      status: editStatus,
+      deadline: editDeadline,
+      position2026: editPosition,
+      adgsPosition: editAdgs,
+      changedBy: editBy,
+      comment: editComment,
+    });
+  }
+
+  return (
+    <div className="registry-card">
+      <div className="filters-row">
+        <input
+          className="search-input"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Поиск по тексту, ГО, сфере..."
+        />
+
+        <select className="filter-select" value={cycle} onChange={(e) => { setCycle(e.target.value); setPage(1); }}>
+          <option value={ALL}>Все циклы</option>
+          {normalizedCycles.map((item) => (
+            <option key={item} value={item}>Цикл {item}</option>
+          ))}
+        </select>
+
+        <select className="filter-select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+          <option value={ALL}>Все статусы</option>
+          {normalizedStatuses.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
+
+        <select className="filter-select" value={sphere} onChange={(e) => { setSphere(e.target.value); setPage(1); }}>
+          <option value={ALL}>Все сферы</option>
+          {normalizedSpheres.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
+
+        <select className="filter-select" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
+          <option value={ALL}>Тип: все</option>
+          {normalizedTypes.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
+
+        <button className="btn-secondary" onClick={reset}>Сбросить</button>
+      </div>
+
+      <div className="registry-meta">
+        Найдено: {total.toLocaleString("ru-RU")} записей
+      </div>
+
+      {isLoading ? (
+        <div className="card loading">Загрузка реестра...</div>
+      ) : error ? (
+        <div className="card error">Не удалось загрузить реестр.</div>
+      ) : (
+        <>
+          <div className="table-wrap">
+            <table className="data-table data-table-compact">
+              <thead>
+                <tr>
+                  <th className="col-num">№</th>
+                  <th className="col-cycle">Цикл</th>
+                  <th className="col-sphere">Сфера</th>
+                  <th className="col-proposal">Предложение</th>
+                  <th className="col-org">Отв. орган</th>
+                  <th className="col-deadline">Срок</th>
+                  <th className="col-status">Статус</th>
+                  <th className="col-actions">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.seq_no || item.id}</td>
+                    <td>{item.cycle || "—"}</td>
+                    <td>{item.sphere_normalized || "—"}</td>
+                    <td className="proposal-cell">
+                      <div className="proposal-clamp">{item.proposal_text || "—"}</div>
+                    </td>
+                    <td className="org-cell">{item.responsible_org || "—"}</td>
+                    <td>{item.due_raw || "—"}</td>
+                    <td>
+                      <span className={statusClass(item.status_normalized)}>
+                        {normalizeLabel(item.status_normalized) || "Нет статуса"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="action-row">
+                        <button className="btn-link" onClick={() => setDetailItem(item)}>
+                          Подробнее
+                        </button>
+                        <button className="btn-link" onClick={() => openEdit(item)}>
+                          Изм.
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: "center", padding: "24px", color: "#64748b" }}>
+                      Нет данных для отображения
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pager">
+            <button
+              className="btn-secondary"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Назад
+            </button>
+
+            <span className="pager-info">
+              Страница {currentPage} из {totalPages}
+            </span>
+
+            <button
+              className="btn-secondary"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Вперёд
+            </button>
+          </div>
+        </>
+      )}
+
+            {detailItem && (
+        <div className="modal-backdrop" onClick={() => setDetailItem(null)}>
+          <div className="modal-card modal-card-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">Подробно по записи #{detailItem.seq_no || detailItem.id}</div>
+
+            <div className="record-details">
+              <div className="record-row">
+                <div className="record-label">П/п</div>
+                <div className="record-value">{detailItem.seq_no || detailItem.id || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Анализ / мониторинг</div>
+                <div className="record-value">{detailItem.record_type_normalized || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">ЦИКЛ</div>
+                <div className="record-value">{detailItem.cycle || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Сфера</div>
+                <div className="record-value">{detailItem.sphere_normalized || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Предложения</div>
+                <div className="record-value record-value-long">{detailItem.proposal_text || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Ответственный исполнитель</div>
+                <div className="record-value">{detailItem.responsible_org || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Заинтересованные государственные органы</div>
+                <div className="record-value record-value-long">{detailItem.interested_orgs || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Форма завершения</div>
+                <div className="record-value record-value-long">{detailItem.completion_form || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Срок исполнения</div>
+                <div className="record-value">{detailItem.due_raw || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Статус ГО</div>
+                <div className="record-value">{normalizeLabel(detailItem.status_normalized) || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Позиция ГО на 2024-2025 гг.</div>
+                <div className="record-value record-value-long">{detailItem.position_2024_2025 || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Позиция ГО на 27.03.2026</div>
+                <div className="record-value record-value-long">{detailItem.position_2026 || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Позиция АДГС</div>
+                <div className="record-value record-value-long">{detailItem.adgs_position || "—"}</div>
+              </div>
+
+              <div className="record-row">
+                <div className="record-label">Кейс</div>
+                <div className="record-value record-value-long">{detailItem.case_text || detailItem.case_note || "—"}</div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn-primary" onClick={() => setDetailItem(null)}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editItem && (
+        <div className="modal-backdrop" onClick={() => setEditItem(null)}>
+          <div className="modal-card modal-card-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">Обновление статуса #{editItem.seq_no || editItem.id}</div>
+
+            <div className="modal-grid">
+              <div>
+                <label className="form-label">Статус</label>
+                <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                  <option value="">Выберите статус</option>
+                  {normalizedStatuses.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Срок</label>
+                <input className="form-input" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="form-label">Позиция 2026</label>
+                <input className="form-input" value={editPosition} onChange={(e) => setEditPosition(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="form-label">Позиция АДГС</label>
+                <input className="form-input" value={editAdgs} onChange={(e) => setEditAdgs(e.target.value)} />
+              </div>
+
+              <div className="modal-col-span">
+                <label className="form-label">Комментарий</label>
+                <textarea className="form-textarea" rows={4} value={editComment} onChange={(e) => setEditComment(e.target.value)} />
+              </div>
+
+              <div className="modal-col-span">
+                <label className="form-label">Кто изменил</label>
+                <input className="form-input" value={editBy} onChange={(e) => setEditBy(e.target.value)} placeholder="ФИО / подразделение" />
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setEditItem(null)}>Отмена</button>
+              <button className="btn-primary" onClick={saveEdit} disabled={mutation.isPending}>
+                {mutation.isPending ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

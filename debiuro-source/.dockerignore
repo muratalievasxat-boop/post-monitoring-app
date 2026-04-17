@@ -1,0 +1,8 @@
+node_modules
+client
+server
+shared
+*.ts
+*.config.*
+debiuro.db
+.git

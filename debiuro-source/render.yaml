@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: debiuro-monitor
+    runtime: node
+    region: frankfurt  # ближайший к Казахстану
+    plan: free
+
+    buildCommand: npm install && npm run build
+    startCommand: NODE_ENV=production node dist/index.cjs
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+
+    # Персистентный диск — данные SQLite сохраняются между перезапусками
+    disk:
+      name: debiuro-data
+      mountPath: /app/data
+      sizeGB: 1
+
+    healthCheckPath: /api/stats

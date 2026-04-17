@@ -1,0 +1,15 @@
+{
+  "name": "post-monitoring-app",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "import-worker"
+  ],
+  "scripts": {
+    "setup:backend": "cd backend && npm install",
+    "setup:frontend": "cd frontend && npm install",
+    "setup:worker": "cd import-worker && npm install",
+    "setup:all": "npm run setup:backend && npm run setup:frontend && npm run setup:worker"
+  }
+}

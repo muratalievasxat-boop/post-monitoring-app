@@ -1,0 +1,14 @@
+{
+  "name": "import-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/main.js",
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "pg": "^8.12.0",
+    "xlsx": "^0.18.5"
+  }
+}
