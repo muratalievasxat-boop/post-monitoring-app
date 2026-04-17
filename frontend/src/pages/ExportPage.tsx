@@ -26,7 +26,7 @@ export default function ExportPage() {
   const [exporting, setExporting] = useState(false);
 
   const { data: meta, isLoading: metaLoading } = useQuery<Meta>({
-    queryKey: ["/api/meta"],
+    queryKey: ["/api/recommendations/filters"],
     queryFn: () => apiRequest("GET", "/api/recommendations/filters").then((r) => r.json()),
   });
 
