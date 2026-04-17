@@ -89,11 +89,19 @@ export async function getRecommendationFilters() {
     order by 1
   `);
 
+  const execs = await pool.query(`
+    select distinct btrim(responsible_org) as responsible_org
+    from registry_records
+    where coalesce(btrim(responsible_org), '') <> ''
+    order by 1
+  `);
+
   return {
     cycles: cycles.rows.map(r => r.cycle),
     statuses: statuses.rows.map(r => r.status_normalized),
     spheres: spheres.rows.map(r => r.sphere),
     types: types.rows.map(r => r.record_type),
+    execs: execs.rows.map(r => r.responsible_org),
   };
 }
 

@@ -27,7 +27,7 @@ export default function ExportPage() {
 
   const { data: meta, isLoading: metaLoading } = useQuery<Meta>({
     queryKey: ["/api/meta"],
-    queryFn: () => apiRequest("GET", "/api/meta").then((r) => r.json()),
+    queryFn: () => apiRequest("GET", "/api/recommendations/filters").then((r) => r.json()),
   });
 
   const summary = useMemo(() => {
