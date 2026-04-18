@@ -5,18 +5,20 @@ const { buildWhere } = require('../../db/queries/recommendations');
 const router = express.Router();
 
 router.get('/meta', async (_req, res) => {
-  const [cycles, statuses, spheres, types] = await Promise.all([
+  const [cycles, statuses, spheres, types, execs] = await Promise.all([
     pool.query(`select distinct coalesce(cycle, '') as cycle from registry_records order by 1`),
     pool.query(`select distinct coalesce(status_normalized, '') as status_normalized from registry_records order by 1`),
     pool.query(`select distinct coalesce(sphere, '') as sphere from registry_records order by 1`),
     pool.query(`select distinct coalesce(record_type, '') as record_type from registry_records order by 1`),
+    pool.query(`select distinct coalesce(responsible_org, '') as responsible_org from registry_records order by 1`),
   ]);
 
-  res.json({ __probe: 'recommendations-routes-live',
-    cycles: cycles.rows.map(r => r.cycle),
-    statuses: statuses.rows.map(r => r.status_normalized),
-    spheres: spheres.rows.map(r => r.sphere),
-    types: types.rows.map(r => r.record_type),
+  res.json({
+    cycles: cycles.rows.map(r => r.cycle).filter(Boolean),
+    statuses: statuses.rows.map(r => r.status_normalized).filter(Boolean),
+    spheres: spheres.rows.map(r => r.sphere).filter(Boolean),
+    types: types.rows.map(r => r.record_type).filter(Boolean),
+    execs: execs.rows.map(r => r.responsible_org).filter(Boolean),
   });
 });
 

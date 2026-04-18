@@ -283,80 +283,118 @@ export function AdminRegistryPage() {
 
       <style>{`
         .admin-registry-page {
-          padding: 24px;
-          background: #f8fafc;
-          min-height: calc(100vh - 48px);
+          padding: 28px 24px 48px;
+          background: #f1f5f9;
+          min-height: 100%;
+          overflow-y: auto;
         }
 
         .admin-registry-shell {
-          max-width: 1120px;
+          max-width: 900px;
           margin: 0 auto;
-          display: grid;
+          display: flex;
+          flex-direction: column;
           gap: 24px;
         }
 
         .admin-page-head h1 {
-          margin: 0 0 8px;
-          font-size: 32px;
-          line-height: 1.1;
+          margin: 0 0 6px;
+          font-size: 22px;
+          font-weight: 700;
+          line-height: 1.2;
           color: #0f172a;
         }
 
         .admin-page-head p {
           margin: 0;
-          color: #475569;
-          max-width: 760px;
+          font-size: 13.5px;
+          color: #64748b;
+          max-width: 640px;
           line-height: 1.6;
         }
 
         .admin-card {
           background: #ffffff;
-          border: 1px solid rgba(148, 163, 184, 0.24);
-          border-radius: 18px;
-          padding: 24px;
-          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 22px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          box-shadow: 0 1px 4px rgba(15,23,42,0.06);
         }
 
-        .admin-card-head {
-          margin-bottom: 18px;
-        }
+        .admin-card-head { display: flex; flex-direction: column; gap: 4px; }
 
         .admin-card-head h2 {
-          margin: 0 0 8px;
-          font-size: 22px;
+          margin: 0;
+          font-size: 15px;
+          font-weight: 700;
           color: #0f172a;
         }
 
         .admin-card-head p {
           margin: 0;
-          color: #475569;
-          line-height: 1.6;
+          font-size: 13px;
+          color: #64748b;
+          line-height: 1.55;
+        }
+
+        .admin-card-head code {
+          font-size: 12px;
+          background: #f1f5f9;
+          color: #334155;
+          border-radius: 4px;
+          padding: 1px 5px;
         }
 
         .admin-import-form {
           display: flex;
           flex-wrap: wrap;
-          align-items: end;
-          gap: 16px;
+          align-items: flex-end;
+          gap: 12px;
         }
 
         .admin-file-field {
-          display: grid;
-          gap: 8px;
-          min-width: 280px;
-          flex: 1 1 320px;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          flex: 1 1 260px;
+          min-width: 0;
         }
 
         .admin-file-field span,
         .admin-field span {
-          font-size: 13px;
+          font-size: 11.5px;
           font-weight: 700;
-          color: #334155;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #64748b;
+        }
+
+        .admin-file-field input[type="file"] {
+          height: 38px;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          background: #fff;
+          padding: 0 10px;
+          font-size: 13px;
+          color: #0f172a;
+          outline: none;
+          cursor: pointer;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .admin-file-field input[type="file"]:focus {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
         }
 
         .admin-field {
-          display: grid;
-          gap: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
           min-width: 0;
         }
 
@@ -366,130 +404,110 @@ export function AdminRegistryPage() {
 
         .admin-filters-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 16px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px 16px;
         }
 
-        .admin-registry-page input,
-        .admin-registry-page select {
+        .admin-registry-page select,
+        .admin-registry-page input[type="text"],
+        .admin-registry-page input:not([type="file"]) {
           width: 100%;
           min-width: 0;
-          height: 44px;
-          border: 1px solid #cbd5e1;
-          border-radius: 12px;
-          padding: 0 14px;
-          font-size: 14px;
+          height: 38px;
+          border: 1.5px solid #cbd5e1;
+          border-radius: 8px;
+          padding: 0 12px;
+          font-size: 13.5px;
+          font-weight: 400;
           color: #0f172a;
-          background: #fff;
+          background: #ffffff !important;
+          -webkit-appearance: auto;
+          appearance: auto;
           outline: none;
           box-sizing: border-box;
+          line-height: 38px;
         }
 
-        .admin-registry-page input:focus,
-        .admin-registry-page select:focus {
+        .admin-registry-page select:focus,
+        .admin-registry-page input:not([type="file"]):focus {
           border-color: #2563eb;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
         }
 
-        .admin-primary-btn,
-        .admin-secondary-btn {
-          height: 44px;
-          padding: 0 16px;
-          border-radius: 12px;
-          font-size: 14px;
-          font-weight: 700;
-          border: none;
-          cursor: pointer;
-          transition: 0.2s ease;
+        .admin-registry-page select option {
+          background: #ffffff;
+          color: #0f172a;
+          font-size: 13.5px;
         }
 
         .admin-primary-btn {
+          height: 38px;
+          padding: 0 20px;
+          border-radius: 8px;
+          font-size: 13.5px;
+          font-weight: 700;
+          border: none;
+          cursor: pointer;
           color: #fff;
           background: #2563eb;
+          transition: background 0.18s;
+          white-space: nowrap;
         }
 
-        .admin-primary-btn:hover:enabled {
-          background: #1d4ed8;
-        }
-
-        .admin-primary-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
+        .admin-primary-btn:hover:enabled { background: #1d4ed8; }
+        .admin-primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .admin-secondary-btn {
-          color: #0f172a;
-          background: #e2e8f0;
+          height: 38px;
+          padding: 0 16px;
+          border-radius: 8px;
+          font-size: 13.5px;
+          font-weight: 600;
+          border: 1.5px solid #e2e8f0;
+          cursor: pointer;
+          color: #334155;
+          background: #f8fafc;
+          transition: background 0.18s, border-color 0.18s;
+          white-space: nowrap;
         }
 
-        .admin-secondary-btn:hover:enabled {
-          background: #cbd5e1;
-        }
-
-        .admin-secondary-btn:disabled {
-          opacity: 0.55;
-          cursor: not-allowed;
-        }
+        .admin-secondary-btn:hover:enabled { background: #e2e8f0; border-color: #cbd5e1; }
+        .admin-secondary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .admin-toolbar {
-          margin-top: 18px;
           display: flex;
           flex-wrap: wrap;
-          gap: 12px;
-          justify-content: space-between;
-        }
-
-        .admin-note-box,
-        .admin-error-box {
-          margin-top: 16px;
-          border-radius: 12px;
-          padding: 12px 14px;
-          font-size: 14px;
-          line-height: 1.5;
+          gap: 10px;
+          align-items: center;
+          justify-content: flex-end;
         }
 
         .admin-note-box {
           background: #eff6ff;
           color: #1e3a8a;
           border: 1px solid #bfdbfe;
+          border-radius: 10px;
+          padding: 11px 14px;
+          font-size: 13.5px;
+          line-height: 1.5;
         }
 
         .admin-error-box {
           background: #fef2f2;
           color: #991b1b;
           border: 1px solid #fecaca;
-          margin-bottom: 16px;
+          border-radius: 10px;
+          padding: 11px 14px;
+          font-size: 13.5px;
+          line-height: 1.5;
         }
 
-        @media (max-width: 900px) {
-          .admin-registry-page {
-            padding: 16px;
-          }
-
-          .admin-card {
-            padding: 18px;
-            border-radius: 16px;
-          }
-
-          .admin-filters-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .admin-field-wide {
-            grid-column: auto;
-          }
-
-          .admin-toolbar {
-            justify-content: stretch;
-          }
-
-          .admin-toolbar > * {
-            flex: 1 1 100%;
-          }
-
-          .admin-page-head h1 {
-            font-size: 28px;
-          }
+        @media (max-width: 720px) {
+          .admin-registry-page { padding: 16px 14px 32px; }
+          .admin-filters-grid { grid-template-columns: 1fr; }
+          .admin-field-wide { grid-column: auto; }
+          .admin-toolbar { justify-content: stretch; }
+          .admin-toolbar > * { flex: 1 1 100%; }
         }
       `}</style>
     </div>

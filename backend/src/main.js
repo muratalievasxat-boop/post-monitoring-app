@@ -3,6 +3,7 @@ import cors from 'cors';
 import dashboardRouter from './routes/dashboard.js';
 import recommendationsRouter from './routes/recommendations.js';
 import adminRegistryRouter from './routes/adminRegistry.js';
+import exportRouter from './routes/export.js';
 
 
 const app = express();
@@ -18,6 +19,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/admin/registry', adminRegistryRouter);
+app.use('/api/export', exportRouter);
 
 app.listen(port, () => {
   console.log(`Backend started on port ${port}`);

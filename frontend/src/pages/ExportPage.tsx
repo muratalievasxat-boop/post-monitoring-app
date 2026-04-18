@@ -91,8 +91,8 @@ export default function ExportPage() {
   const disableExport = metaLoading || exporting;
 
   return (
-    <div className="p-5 space-y-6 max-w-3xl">
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
+    <div style={{padding:"24px 28px",maxWidth:"860px",display:"flex",flexDirection:"column",gap:"20px"}}>
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:"14px",padding:"22px 24px",display:"flex",flexDirection:"column",gap:"16px",boxShadow:"0 1px 4px rgba(15,23,42,0.06)"}}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <FileSpreadsheet size={18} className="text-primary" />
@@ -109,11 +109,11 @@ export default function ExportPage() {
           «Реестр рекомендаций».
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:"12px 16px"}}>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Цикл</label>
             <Select value={cycle} onValueChange={setCycle} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-cycle" className="text-sm">
+              <SelectTrigger data-testid="export-cycle" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
                 <SelectValue placeholder="Все циклы" />
               </SelectTrigger>
               <SelectContent>
@@ -130,7 +130,7 @@ export default function ExportPage() {
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Статус</label>
             <Select value={status} onValueChange={setStatus} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-status" className="text-sm">
+              <SelectTrigger data-testid="export-status" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
                 <SelectValue placeholder="Все статусы" />
               </SelectTrigger>
               <SelectContent>
@@ -147,10 +147,10 @@ export default function ExportPage() {
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Сфера</label>
             <Select value={sphere} onValueChange={setSphere} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-sphere" className="text-sm">
+              <SelectTrigger data-testid="export-sphere" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
                 <SelectValue placeholder="Все сферы" />
               </SelectTrigger>
-              <SelectContent className="max-h-60">
+              <SelectContent style={{maxHeight:"240px",overflowY:"auto"}}>
                 <SelectItem value={ALL}>Все сферы</SelectItem>
                 {meta?.spheres.map((s) => (
                   <SelectItem key={s} value={s}>
@@ -164,10 +164,10 @@ export default function ExportPage() {
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Ответственный</label>
             <Select value={exec} onValueChange={setExec} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-exec" className="text-sm">
+              <SelectTrigger data-testid="export-exec" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
                 <SelectValue placeholder="Все исполнители" />
               </SelectTrigger>
-              <SelectContent className="max-h-60">
+              <SelectContent style={{maxHeight:"240px",overflowY:"auto"}}>
                 <SelectItem value={ALL}>Все исполнители</SelectItem>
                 {meta?.execs.map((e) => (
                   <SelectItem key={e} value={e}>
@@ -198,7 +198,7 @@ export default function ExportPage() {
         </p>
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-5 space-y-3 shadow-sm">
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:"14px",padding:"22px 24px",display:"flex",flexDirection:"column",gap:"14px",boxShadow:"0 1px 4px rgba(15,23,42,0.06)"}}>
         <div className="flex items-center gap-2 mb-1">
           <Upload size={18} className="text-primary" />
           <h2 className="text-base font-bold">Импорт нового файла</h2>
