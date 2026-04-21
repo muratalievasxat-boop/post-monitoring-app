@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: post-monitoring-app
+    runtime: node
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
+    startCommand: node backend/src/main.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PORT
+        value: 3002
+      - key: NODE_ENV
+        value: production

@@ -1,10 +1,15 @@
 import express from 'express';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 import dashboardRouter from './routes/dashboard.js';
 import recommendationsRouter from './routes/recommendations.js';
 import adminRegistryRouter from './routes/adminRegistry.js';
 import exportRouter from './routes/export.js';
 import { pool } from './db/pool.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const port = process.env.PORT || 3002;
@@ -20,6 +25,15 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/admin/registry', adminRegistryRouter);
 app.use('/api/export', exportRouter);
+
+// Serve frontend in production
+const frontendDist = join(__dirname, '../../frontend/dist');
+if (existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (_req, res) => {
+    res.sendFile(join(frontendDist, 'index.html'));
+  });
+}
 
 async function renameStatus() {
   try {
