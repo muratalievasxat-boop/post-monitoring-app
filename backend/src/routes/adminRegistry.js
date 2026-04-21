@@ -3,17 +3,23 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { pool } from '../db/pool.js';
 
+
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
 
 function norm(v) {
   if (v === null || v === undefined) return '';
   return String(v).trim();
 }
 
+
 function normalizeStatus(statusRaw) {
-  return norm(statusRaw);
+  const v = norm(statusRaw);
+  if (!v) return '';
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
 }
+
 
 const HEADER_MAP = {
   'П/п': 'row_number',
@@ -32,6 +38,7 @@ const HEADER_MAP = {
   'Кейс': 'case_raw',
 };
 
+
 // ---------- IMPORT ----------
 router.post('/import', upload.single('file'), async (req, res) => {
   try {
@@ -39,22 +46,27 @@ router.post('/import', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Файл не передан' });
     }
 
+
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
+
 
     const sheet = workbook.getWorksheet('перечень');
     if (!sheet) {
       return res.status(400).json({ error: 'Лист "перечень" не найден в файле' });
     }
 
+
     const headerRowIdx = 2;
     const headerRow = sheet.getRow(headerRowIdx);
     const headerExcel = headerRow.values.slice(1).map(norm);
+
 
     const client = await pool.connect();
     try {
       await client.query('begin');
       await client.query('truncate table registry_records restart identity;');
+
 
       const insertSql = `
         insert into registry_records (
@@ -78,7 +90,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
         )
       `;
 
+
       let inserted = 0;
+
 
       for (let rowNumber = headerRowIdx + 1; rowNumber <= sheet.rowCount; rowNumber++) {
         const row = sheet.getRow(rowNumber);
@@ -88,11 +102,13 @@ router.post('/import', upload.single('file'), async (req, res) => {
         );
         if (!hasAny) continue;
 
+
         const rec = {};
         for (const [src, dst] of Object.entries(HEADER_MAP)) {
           const idx = headerExcel.indexOf(src);
           rec[dst] = idx === -1 ? '' : norm(cells[idx]);
         }
+
 
         let rowNumberVal = rec.row_number || null;
         if (rowNumberVal) {
@@ -100,8 +116,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
           rowNumberVal = Number.isNaN(parsed) ? null : parsed;
         }
 
+
         const statusRaw = rec.status_raw || '';
         const statusNormalized = normalizeStatus(statusRaw);
+
 
         await client.query(insertSql, [
           rowNumberVal,
@@ -121,8 +139,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
           rec.case_raw || '',
         ]);
 
+
         inserted += 1;
       }
+
 
       await client.query('commit');
       return res.json({ ok: true, rows: inserted });
@@ -143,6 +163,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
   }
 });
 
+
 // ---------- EXPORT ----------
 router.get('/export', async (req, res) => {
   try {
@@ -154,8 +175,10 @@ router.get('/export', async (req, res) => {
       q = '',
     } = req.query;
 
+
     const values = [];
     const where = [];
+
 
     if (q) {
       values.push(`%${q}%`);
@@ -167,27 +190,33 @@ router.get('/export', async (req, res) => {
       )`);
     }
 
+
     if (cycle) {
       values.push(cycle.trim());
       where.push(`btrim(coalesce(cycle,'')) = $${values.length}`);
     }
 
+
     if (status) {
-      values.push(status.trim());
-      where.push(`btrim(coalesce(status_normalized,'')) = $${values.length}`);
+      values.push(status.trim().toLowerCase());
+      where.push(`lower(btrim(coalesce(status_normalized,''))) = $${values.length}`);
     }
+
 
     if (sphere) {
       values.push(sphere.trim());
       where.push(`btrim(coalesce(sphere,'')) = $${values.length}`);
     }
 
+
     if (responsible) {
-      values.push(responsible.trim());
-      where.push(`btrim(coalesce(responsible_org,'')) = $${values.length}`);
+      values.push(`%${responsible.trim()}%`);
+      where.push(`coalesce(responsible,'') ilike $${values.length}`);
     }
 
+
     const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+
 
     const sql = `
       select
@@ -211,10 +240,13 @@ router.get('/export', async (req, res) => {
       order by coalesce(row_number, id) asc, id asc
     `;
 
+
     const { rows } = await pool.query(sql, values);
+
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('реестр');
+
 
     if (rows.length === 0) {
       sheet.addRow(['Нет данных по заданным фильтрам']);
@@ -234,9 +266,11 @@ router.get('/export', async (req, res) => {
       });
     }
 
+
     const fileName = `registry_export_${new Date()
       .toISOString()
       .slice(0, 10)}.xlsx`;
+
 
     res.setHeader(
       'Content-Type',
@@ -247,6 +281,7 @@ router.get('/export', async (req, res) => {
       `attachment; filename="${encodeURIComponent(fileName)}"`,
     );
 
+
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
@@ -256,5 +291,6 @@ router.get('/export', async (req, res) => {
       .json({ error: 'Ошибка при экспорте', details: err.message });
   }
 });
+
 
 export default router;

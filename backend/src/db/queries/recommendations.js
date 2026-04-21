@@ -10,39 +10,28 @@ function normalizeStatusGroup(status) {
   if (v === 'исполнено') return 'done';
   if (v.startsWith('в работе')) return 'active';
   if (v.startsWith('не поддерживается')) return 'rejected';
-  if (v.includes('исключ')) return 'excluded';
+  if (v.includes('исключ') || v.includes('снятия с контроля')) return 'excluded';
   return 'unknown';
 }
 
 const statusNormSql = `btrim(lower(coalesce(status_normalized, '')))`;
 
 export async function getDashboardSummary() {
+  const excludedSql = `(${statusNormSql} like '%исключ%' or ${statusNormSql} = 'для снятия с контроля')`;
+
   const totalsRes = await pool.query(`
     select
       count(*)::int as all,
-      count(*) filter (where ${statusNormSql} = 'в работе')::int as active,
+      count(*) filter (where ${statusNormSql} like 'в работе%')::int as active,
       count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
       count(*) filter (where ${statusNormSql} like 'не поддерживается%')::int as rejected,
-      count(*) filter (where ${statusNormSql} like '%исключ%')::int as excluded,
+      count(*) filter (where ${excludedSql})::int as excluded,
       count(*) filter (where ${statusNormSql} = '')::int as unknown,
-      0::int as overdue
+      count(*) filter (
+        where ${statusNormSql} like 'в работе%'
+        and (due_raw like '%2024%' or due_raw like '%2025%')
+      )::int as overdue
     from registry_records
-  `);
-
-  const bySphereRes = await pool.query(`
-    select coalesce(nullif(btrim(sphere), ''), 'Без сферы') as sphere, count(*)::int as count
-    from registry_records
-    group by 1
-    order by 2 desc, 1 asc
-    limit 20
-  `);
-
-  const byResponsibleRes = await pool.query(`
-    select coalesce(nullif(btrim(responsible_org), ''), 'Не указан') as responsible_org, count(*)::int as count
-    from registry_records
-    group by 1
-    order by 2 desc, 1 asc
-    limit 20
   `);
 
   const byCycleRes = await pool.query(`
@@ -52,11 +41,120 @@ export async function getDashboardSummary() {
     order by 1 asc
   `);
 
+  const byCycleStatusRes = await pool.query(`
+    select
+      coalesce(nullif(btrim(cycle), ''), 'Без цикла') as cycle,
+      count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
+      count(*) filter (where ${statusNormSql} like 'в работе%')::int as active,
+      count(*) filter (where ${statusNormSql} like 'не поддерживается%')::int as rejected,
+      count(*) filter (where ${excludedSql})::int as excluded,
+      count(*)::int as total
+    from registry_records
+    group by 1
+    order by 1 asc
+  `);
+
+  const byCycleTypeCompletionRes = await pool.query(`
+    select
+      coalesce(nullif(btrim(cycle), ''), 'Без цикла') as cycle,
+      count(*) filter (where btrim(record_type) = 'Анализ')::int as analiz_total,
+      count(*) filter (where btrim(record_type) = 'Анализ' and ${statusNormSql} = 'исполнено')::int as analiz_done,
+      count(*) filter (where btrim(record_type) = 'Мониторинг')::int as monitoring_total,
+      count(*) filter (where btrim(record_type) = 'Мониторинг' and ${statusNormSql} = 'исполнено')::int as monitoring_done
+    from registry_records
+    group by 1
+    order by 1 asc
+  `);
+
+  const byOrgStatusRes = await pool.query(`
+    select
+      coalesce(nullif(btrim(responsible_org), ''), 'Не указан') as responsible_org,
+      count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
+      count(*)::int as total,
+      round(
+        count(*) filter (where ${statusNormSql} = 'исполнено')::numeric * 100
+        / nullif(count(*), 0)
+      )::int as pct
+    from registry_records
+    group by 1
+    having count(*) >= 5
+    order by pct desc, total desc
+    limit 15
+  `);
+
+  const byOverdueOrgRes = await pool.query(`
+    select
+      coalesce(nullif(btrim(responsible_org), ''), 'Не указан') as responsible_org,
+      count(*)::int as overdue_count
+    from registry_records
+    where ${statusNormSql} like 'в работе%'
+      and (due_raw like '%2024%' or due_raw like '%2025%')
+    group by 1
+    order by 2 desc
+    limit 15
+  `);
+
+  const bySphereStatusRes = await pool.query(`
+    select
+      coalesce(nullif(btrim(sphere), ''), 'Без сферы') as sphere,
+      count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
+      count(*)::int as total,
+      round(
+        count(*) filter (where ${statusNormSql} = 'исполнено')::numeric * 100
+        / nullif(count(*), 0)
+      )::int as pct
+    from registry_records
+    group by 1
+    having count(*) >= 3
+    order by pct desc, total desc
+    limit 15
+  `);
+
+  const byAttentionRes = await pool.query(`
+    select responsible_org, total, done, pct
+    from (
+      select
+        coalesce(nullif(btrim(responsible_org), ''), 'Не указан') as responsible_org,
+        count(*)::int as total,
+        count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
+        round(
+          count(*) filter (where ${statusNormSql} = 'исполнено')::numeric * 100
+          / nullif(count(*), 0)
+        )::int as pct
+      from registry_records
+      where btrim(cycle) = 'VII'
+      group by 1
+    ) t
+    where total >= 10 and pct <= 10
+    order by pct asc, total desc
+  `);
+
+  const byCompletionFormRes = await pool.query(`
+    select
+      coalesce(nullif(btrim(completion_form), ''), 'Не указана') as completion_form,
+      count(*)::int as total,
+      count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
+      round(
+        count(*) filter (where ${statusNormSql} = 'исполнено')::numeric * 100
+        / nullif(count(*), 0)
+      )::int as pct
+    from registry_records
+    where coalesce(btrim(completion_form), '') <> ''
+    group by 1
+    order by total desc
+    limit 12
+  `);
+
   return {
     totals: totalsRes.rows[0],
-    bySphere: bySphereRes.rows,
-    byResponsibleOrg: byResponsibleRes.rows,
     byCycle: byCycleRes.rows,
+    byCycleStatus: byCycleStatusRes.rows,
+    byCycleTypeCompletion: byCycleTypeCompletionRes.rows,
+    byOrgStatus: byOrgStatusRes.rows,
+    byOverdueOrg: byOverdueOrgRes.rows,
+    bySphereStatus: bySphereStatusRes.rows,
+    byAttention: byAttentionRes.rows,
+    byCompletionForm: byCompletionFormRes.rows,
   };
 }
 
@@ -69,7 +167,9 @@ export async function getRecommendationFilters() {
   `);
 
   const statuses = await pool.query(`
-    select distinct btrim(status_normalized) as status_normalized
+    select distinct
+      upper(left(btrim(lower(status_normalized)), 1))
+      || lower(substring(btrim(status_normalized) from 2)) as status_normalized
     from registry_records
     where coalesce(btrim(status_normalized), '') <> ''
     order by 1
@@ -90,9 +190,9 @@ export async function getRecommendationFilters() {
   `);
 
   const execs = await pool.query(`
-    select distinct btrim(responsible_org) as responsible_org
-    from registry_records
-    where coalesce(btrim(responsible_org), '') <> ''
+    select distinct btrim("responsible") as responsible_org
+    from recommendations
+    where coalesce(btrim("responsible"), '') <> '' and "responsible" not ilike '%object%'
     order by 1
   `);
 
@@ -106,7 +206,7 @@ export async function getRecommendationFilters() {
 }
 
 export async function listRecommendations(params) {
-  const q = params.q || '';
+  const q = params.search || params.q || '';
   const cycle = params.cycle || '';
   const status = params.status || '';
   const sphere = params.sphere || '';
@@ -136,8 +236,8 @@ export async function listRecommendations(params) {
   }
 
   if (status) {
-    values.push(status.trim());
-    where.push(`btrim(coalesce(status_normalized,'')) = $${values.length}`);
+    values.push(status.trim().toLowerCase());
+    where.push(`lower(btrim(coalesce(status_normalized,''))) = $${values.length}`);
   }
 
   if (sphere) {
@@ -231,11 +331,19 @@ export async function getRecommendationById(id) {
   return row;
 }
 
+function normalizeStatusValue(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return null;
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+}
+
 export async function updateRecommendationStatus(id, payload) {
-  const status_normalized = payload.status_normalized?.trim() || null;
-  const due_raw = payload.due_raw?.trim() || null;
-  const position_go_2026_03_27 = payload.position_go_2026_03_27 ?? null;
-  const position_adgs = payload.position_adgs ?? null;
+  // Frontend sends `status`, backend field is status_normalized — accept both
+  const rawStatus = payload.status ?? payload.status_normalized ?? null;
+  const status_normalized = normalizeStatusValue(rawStatus);
+  const due_raw = payload.deadline?.trim() || payload.due_raw?.trim() || null;
+  const position_go_2026_03_27 = payload.position2026 ?? payload.position_go_2026_03_27 ?? null;
+  const position_adgs = payload.adgsPosition ?? payload.position_adgs ?? null;
   const comment = payload.comment ?? null;
 
   const res = await pool.query(`

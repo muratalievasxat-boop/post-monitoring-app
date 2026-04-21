@@ -1,10 +1,7 @@
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Download, FileSpreadsheet, Info, Upload } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Download, Upload, FileSpreadsheet, FileCheck, X, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface Meta {
   spheres: string[];
@@ -14,224 +11,601 @@ interface Meta {
   execs: string[];
 }
 
-const ALL = "__all__";
+function fmtSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
 
 export default function ExportPage() {
-  const { toast } = useToast();
-  const [cycle, setCycle] = useState(ALL);
-  const [status, setStatus] = useState(ALL);
-  const [sphere, setSphere] = useState(ALL);
-  const [exec, setExec] = useState(ALL);
-  const [importing, setImporting] = useState(false);
+  const [cycle, setCycle]       = useState("");
+  const [status, setStatus]     = useState("");
+  const [sphere, setSphere]     = useState("");
+  const [exec, setExec]         = useState("");
   const [exporting, setExporting] = useState(false);
 
-  const { data: meta, isLoading: metaLoading } = useQuery<Meta>({
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [importing, setImporting]     = useState(false);
+  const [importResult, setImportResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [dragOver, setDragOver]       = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: meta, isLoading } = useQuery<Meta>({
     queryKey: ["/api/recommendations/filters"],
-    queryFn: () => apiRequest("GET", "/api/recommendations/filters").then((r) => r.json()),
+    queryFn: () => apiRequest("GET", "/api/recommendations/filters").then(r => r.json()),
   });
 
-  const summary = useMemo(() => {
-    const parts: string[] = [];
-    parts.push(cycle === ALL ? "все циклы" : `цикл ${cycle}`);
-    parts.push(status === ALL ? "все статусы" : status.toLowerCase());
-    parts.push(sphere === ALL ? "все сферы" : sphere);
-    parts.push(exec === ALL ? "все исполнители" : exec);
-    return parts.join(" · ");
-  }, [cycle, status, sphere, exec]);
-
-  function buildParams() {
-    const p = new URLSearchParams();
-    if (cycle !== ALL) p.set("cycle", cycle);
-    if (status !== ALL) p.set("status", status);
-    if (sphere !== ALL) p.set("sphere", sphere);
-    if (exec !== ALL) p.set("responsible", exec);
-    return p.toString();
-  }
-
   function doExport() {
-    const qs = buildParams();
+    const p = new URLSearchParams();
+    if (cycle)  p.set("cycle", cycle);
+    if (status) p.set("status", status);
+    if (sphere) p.set("sphere", sphere);
+    if (exec)   p.set("responsible", exec);
     setExporting(true);
-    try {
-      window.location.href = `/api/export${qs ? "?" + qs : ""}`;
-    } finally {
-      setTimeout(() => setExporting(false), 800);
-    }
+    window.location.href = `/api/admin/registry/export${p.toString() ? "?" + p.toString() : ""}`;
+    setTimeout(() => setExporting(false), 1500);
   }
 
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function onFileSelected(file: File | null) {
     if (!file) return;
+    setPendingFile(file);
+    setImportResult(null);
+  }
 
+  function clearFile() {
+    setPendingFile(null);
+    setImportResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function doImport() {
+    if (!pendingFile) return;
     setImporting(true);
+    setImportResult(null);
     const form = new FormData();
-    form.append("file", file);
-
+    form.append("file", pendingFile);
     try {
-      const res = await fetch("/api/import", { method: "POST", body: form });
-      if (!res.ok) throw new Error("Import failed");
-      const data = await res.json();
-
-      toast({
-        title: "Импорт завершён",
-        description: `Загружено ${data.imported ?? "N"} записей`,
-      });
-
-      e.target.value = "";
-    } catch {
-      toast({
-        title: "Ошибка импорта",
-        description: "Проверьте файл и повторите попытку",
-        variant: "destructive",
-      });
+      const res = await fetch("/api/admin/registry/import", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Ошибка импорта");
+      setImportResult({ ok: true, text: `Загружено строк: ${data.rows ?? data.imported ?? 0}` });
+      setPendingFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err: any) {
+      setImportResult({ ok: false, text: err?.message || "Неизвестная ошибка" });
     } finally {
       setImporting(false);
     }
   }
 
-  const disableExport = metaLoading || exporting;
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
+      onFileSelected(file);
+    }
+  }
+
+  function resetFilters() {
+    setCycle(""); setStatus(""); setSphere(""); setExec("");
+  }
 
   return (
-    <div style={{padding:"24px 28px",maxWidth:"860px",display:"flex",flexDirection:"column",gap:"20px"}}>
-      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:"14px",padding:"22px 24px",display:"flex",flexDirection:"column",gap:"16px",boxShadow:"0 1px 4px rgba(15,23,42,0.06)"}}>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet size={18} className="text-primary" />
-            <h2 className="text-base font-bold">Экспорт в Excel</h2>
-          </div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-            <Info size={12} />
-            Файл = текущий реестр с фильтрами
-          </span>
-        </div>
+    <div className="export-page-shell">
 
-        <p className="text-sm text-muted-foreground">
-          Выберите фильтры — система сформирует Excel с теми же строками и колонками, что вы видите в разделе
-          «Реестр рекомендаций».
+      {/* ── Экспорт ── */}
+      <div className="export-card">
+        <div className="export-card-header">
+          <FileSpreadsheet size={16} className="export-card-icon" />
+          <h2 className="export-card-title">Экспорт в Excel</h2>
+        </div>
+        <p className="export-card-desc">
+          Выберите фильтры — система выгрузит именно ту таблицу, которую вы видите в
+          реестре, в формате .xlsx.
         </p>
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:"12px 16px"}}>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Цикл</label>
-            <Select value={cycle} onValueChange={setCycle} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-cycle" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
-                <SelectValue placeholder="Все циклы" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Все циклы</SelectItem>
-                {meta?.cycles.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    Цикл {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="export-filters-grid">
+          <div className="export-field">
+            <label className="export-label">Цикл</label>
+            <select className="export-select" value={cycle} onChange={e => setCycle(e.target.value)} disabled={isLoading}>
+              <option value="">Все циклы</option>
+              {(meta?.cycles ?? []).map(v => <option key={v} value={v}>Цикл {v}</option>)}
+            </select>
           </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Статус</label>
-            <Select value={status} onValueChange={setStatus} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-status" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
-                <SelectValue placeholder="Все статусы" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Все статусы</SelectItem>
-                {meta?.statuses.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="export-field">
+            <label className="export-label">Статус</label>
+            <select className="export-select" value={status} onChange={e => setStatus(e.target.value)} disabled={isLoading}>
+              <option value="">Все статусы</option>
+              {(meta?.statuses ?? []).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
           </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Сфера</label>
-            <Select value={sphere} onValueChange={setSphere} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-sphere" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
-                <SelectValue placeholder="Все сферы" />
-              </SelectTrigger>
-              <SelectContent style={{maxHeight:"240px",overflowY:"auto"}}>
-                <SelectItem value={ALL}>Все сферы</SelectItem>
-                {meta?.spheres.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="export-field">
+            <label className="export-label">Сфера</label>
+            <select className="export-select" value={sphere} onChange={e => setSphere(e.target.value)} disabled={isLoading}>
+              <option value="">Все сферы</option>
+              {(meta?.spheres ?? []).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
           </div>
-
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase mb-1 block">Ответственный</label>
-            <Select value={exec} onValueChange={setExec} disabled={metaLoading}>
-              <SelectTrigger data-testid="export-exec" style={{height:"38px",background:"#ffffff",border:"1.5px solid #cbd5e1",borderRadius:"8px",fontSize:"13.5px",padding:"0 12px",color:"#0f172a",width:"100%"}}>
-                <SelectValue placeholder="Все исполнители" />
-              </SelectTrigger>
-              <SelectContent style={{maxHeight:"240px",overflowY:"auto"}}>
-                <SelectItem value={ALL}>Все исполнители</SelectItem>
-                {meta?.execs.map((e) => (
-                  <SelectItem key={e} value={e}>
-                    {e}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="export-field">
+            <label className="export-label">Ответственный</label>
+            <select className="export-select" value={exec} onChange={e => setExec(e.target.value)} disabled={isLoading}>
+              <option value="">Все исполнители</option>
+              {(meta?.execs ?? []).map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-1">
-          <div className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-[11px] text-muted-foreground max-w-full">
-            <span className="font-semibold uppercase tracking-wide text-[10px]">Текущий выбор:</span>
-            <span className="truncate max-w-[260px] md:max-w-xs">{summary}</span>
-          </div>
-
-          <div className="flex gap-2 justify-start md:justify-end">
-            <Button data-testid="btn-export" onClick={doExport} className="gap-2" disabled={disableExport}>
-              <Download size={16} className={exporting ? "animate-pulse" : ""} />
-              {exporting ? "Формирование файла..." : "Скачать Excel (.xlsx)"}
-            </Button>
-          </div>
+        <div className="export-toolbar">
+          <button className="export-reset-btn" type="button" onClick={resetFilters}
+            disabled={!cycle && !status && !sphere && !exec}>
+            Сбросить
+          </button>
+          <button className="export-primary-btn" type="button" onClick={doExport}
+            disabled={isLoading || exporting}>
+            <Download size={15} />
+            {exporting ? "Формирование..." : "Скачать Excel (.xlsx)"}
+          </button>
         </div>
 
-        <p className="text-xs text-muted-foreground mt-2 leading-snug">
+        <p className="export-note">
           Файл содержит все поля оригинальной таблицы постмониторинга. Совместим с Microsoft Excel и LibreOffice.
         </p>
       </div>
 
-      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:"14px",padding:"22px 24px",display:"flex",flexDirection:"column",gap:"14px",boxShadow:"0 1px 4px rgba(15,23,42,0.06)"}}>
-        <div className="flex items-center gap-2 mb-1">
-          <Upload size={18} className="text-primary" />
-          <h2 className="text-base font-bold">Импорт нового файла</h2>
+      {/* ── Импорт ── */}
+      <div className="export-card">
+        <div className="export-card-header">
+          <Upload size={16} className="export-card-icon" />
+          <h2 className="export-card-title">Импорт нового файла</h2>
         </div>
-
-        <p className="text-sm text-muted-foreground">
-          Загрузите обновлённый файл постмониторинга (.xlsx). Данные будут добавлены или обновлены в базе.
+        <p className="export-card-desc">
+          Загрузите обновлённый файл постмониторинга (.xlsx).
           Лист должен называться <strong>«перечень»</strong> и иметь ту же структуру колонок.
+          Существующие данные будут заменены.
         </p>
 
-        <label className="cursor-pointer block">
-          <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary hover:bg-primary/5 transition-colors">
-            <Upload size={24} className="mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm font-medium">
-              {importing ? "Загрузка и обработка файла..." : "Выберите файл .xlsx"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">или перетащите сюда</p>
+        {/* Зона выбора файла — скрыта когда файл уже выбран */}
+        {!pendingFile && !importing && (
+          <div
+            className={`import-dropzone${dragOver ? " import-dropzone--drag" : ""}`}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload size={24} className="import-dropzone-icon" />
+            <span className="import-dropzone-title">Перетащите файл .xlsx сюда</span>
+            <span className="import-dropzone-sub">или нажмите для выбора</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="import-file-input"
+              onChange={e => onFileSelected(e.target.files?.[0] ?? null)}
+              disabled={importing}
+            />
           </div>
-          <input
-            data-testid="input-import"
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleImport}
-            disabled={importing}
-          />
-        </label>
+        )}
 
-        <p className="text-[11px] text-muted-foreground leading-snug">
-          Рекомендуется использовать тот же шаблон, который вы получаете через экспорт. Перед загрузкой проверьте,
-          что не менялись названия листа и колонок.
-        </p>
+        {/* Прогресс загрузки */}
+        {importing && (
+          <div className="import-progress-block">
+            <div className="import-progress-header">
+              <Upload size={16} className="import-progress-icon" />
+              <span className="import-progress-label">Загрузка файла на сервер...</span>
+            </div>
+            <div className="import-progress-bar-track">
+              <div className="import-progress-bar-fill" />
+            </div>
+            <span className="import-progress-hint">Пожалуйста, не закрывайте страницу</span>
+          </div>
+        )}
+
+        {/* Превью выбранного файла */}
+        {pendingFile && !importing && (
+          <div className="import-file-preview">
+            <FileCheck size={18} className="import-file-preview-icon" />
+            <div className="import-file-preview-info">
+              <span className="import-file-preview-name">{pendingFile.name}</span>
+              <span className="import-file-preview-size">{fmtSize(pendingFile.size)}</span>
+            </div>
+            <button className="import-file-clear-btn" onClick={clearFile} title="Убрать файл">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Результат */}
+        {importResult && (
+          <div className={`import-result-msg${importResult.ok ? "" : " import-result-msg--error"}`}>
+            {importResult.ok
+              ? <CheckCircle2 size={15} className="import-result-icon" />
+              : <AlertCircle size={15} className="import-result-icon" />}
+            <div>
+              <strong>{importResult.ok ? "Импорт завершён успешно" : "Ошибка импорта"}</strong>
+              <div className="import-result-detail">{importResult.text}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Кнопка импорта */}
+        {(pendingFile || importResult) && !importing && (
+          <div className="import-toolbar">
+            {importResult && (
+              <button className="export-reset-btn" onClick={() => { setImportResult(null); }}>
+                {importResult.ok ? "Загрузить ещё" : "Попробовать снова"}
+              </button>
+            )}
+            {pendingFile && (
+              <button className="export-primary-btn" onClick={doImport} disabled={importing}>
+                <Upload size={15} />
+                Импортировать
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      <style>{`
+        .export-page-shell {
+          max-width: 760px;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .export-card {
+          background: hsl(var(--card));
+          border: 1px solid hsl(var(--border));
+          border-radius: 14px;
+          padding: 20px 22px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .export-card-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .export-card-icon {
+          color: hsl(var(--primary));
+          flex-shrink: 0;
+        }
+
+        .export-card-title {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 700;
+          color: hsl(var(--foreground));
+        }
+
+        .export-card-desc {
+          margin: 0;
+          font-size: 13px;
+          color: hsl(var(--muted-foreground));
+          line-height: 1.55;
+        }
+
+        .export-filters-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px 16px;
+        }
+
+        .export-field {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .export-label {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: hsl(var(--muted-foreground));
+        }
+
+        .export-select {
+          height: 36px;
+          padding: 0 10px;
+          border: 1px solid hsl(var(--border));
+          border-radius: 8px;
+          font-size: 13px;
+          font-family: inherit;
+          background: hsl(var(--card));
+          color: hsl(var(--foreground));
+          outline: none;
+          cursor: pointer;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .export-select:focus {
+          border-color: hsl(var(--ring));
+          box-shadow: 0 0 0 3px hsl(var(--ring) / 0.12);
+        }
+
+        .export-select:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .export-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          justify-content: flex-end;
+        }
+
+        .export-primary-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 36px;
+          padding: 0 16px;
+          border-radius: 8px;
+          font-size: 13.5px;
+          font-weight: 700;
+          font-family: inherit;
+          border: none;
+          cursor: pointer;
+          color: hsl(var(--primary-foreground));
+          background: hsl(var(--primary));
+          transition: filter 0.15s;
+          white-space: nowrap;
+        }
+
+        .export-primary-btn:hover:enabled { filter: brightness(1.1); }
+        .export-primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+        .export-reset-btn {
+          height: 36px;
+          padding: 0 14px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+          font-family: inherit;
+          border: 1px solid hsl(var(--border));
+          cursor: pointer;
+          color: hsl(var(--muted-foreground));
+          background: hsl(var(--card));
+          transition: background 0.15s, color 0.15s;
+        }
+
+        .export-reset-btn:hover:enabled {
+          background: hsl(var(--muted));
+          color: hsl(var(--foreground));
+        }
+
+        .export-reset-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .export-note {
+          margin: 0;
+          font-size: 12px;
+          color: hsl(var(--muted-foreground));
+          line-height: 1.5;
+        }
+
+        /* ── Drop zone ── */
+        .import-dropzone {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 5px;
+          padding: 28px 20px;
+          border: 2px dashed hsl(var(--border));
+          border-radius: 12px;
+          cursor: pointer;
+          text-align: center;
+          transition: border-color 0.15s, background 0.15s;
+          background: transparent;
+          user-select: none;
+        }
+
+        .import-dropzone:hover,
+        .import-dropzone--drag {
+          border-color: hsl(var(--primary));
+          background: hsl(var(--primary) / 0.04);
+        }
+
+        .import-dropzone-icon {
+          color: hsl(var(--muted-foreground));
+          margin-bottom: 2px;
+        }
+
+        .import-dropzone-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: hsl(var(--foreground));
+        }
+
+        .import-dropzone-sub {
+          font-size: 12px;
+          color: hsl(var(--muted-foreground));
+        }
+
+        .import-file-input { display: none; }
+
+        /* ── Progress bar ── */
+        .import-progress-block {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 14px 16px;
+          border: 1px solid hsl(var(--border));
+          border-radius: 10px;
+          background: hsl(var(--muted));
+        }
+
+        .import-progress-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .import-progress-icon {
+          color: hsl(var(--primary));
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+
+        .import-progress-label {
+          font-size: 13px;
+          font-weight: 600;
+          color: hsl(var(--foreground));
+        }
+
+        .import-progress-bar-track {
+          height: 4px;
+          border-radius: 2px;
+          background: hsl(var(--border));
+          overflow: hidden;
+        }
+
+        .import-progress-bar-fill {
+          height: 100%;
+          border-radius: 2px;
+          background: hsl(var(--primary));
+          animation: indeterminate 1.4s ease-in-out infinite;
+          transform-origin: left;
+        }
+
+        @keyframes indeterminate {
+          0%   { transform: scaleX(0.05) translateX(0); }
+          50%  { transform: scaleX(0.5)  translateX(80%); }
+          100% { transform: scaleX(0.05) translateX(2000%); }
+        }
+
+        .import-progress-hint {
+          font-size: 11px;
+          color: hsl(var(--muted-foreground));
+        }
+
+        /* ── File preview ── */
+        .import-file-preview {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border: 1px solid hsl(var(--border));
+          border-radius: 10px;
+          background: hsl(var(--muted));
+        }
+
+        .import-file-preview-icon {
+          color: hsl(var(--primary));
+          flex-shrink: 0;
+        }
+
+        .import-file-preview-info {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+
+        .import-file-preview-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: hsl(var(--foreground));
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .import-file-preview-size {
+          font-size: 11px;
+          color: hsl(var(--muted-foreground));
+        }
+
+        .import-file-clear-btn {
+          width: 26px;
+          height: 26px;
+          border-radius: 6px;
+          border: 1px solid hsl(var(--border));
+          background: transparent;
+          color: hsl(var(--muted-foreground));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: background 0.15s, color 0.15s;
+        }
+
+        .import-file-clear-btn:hover {
+          background: hsl(var(--muted));
+          color: hsl(var(--foreground));
+        }
+
+        /* ── Result message ── */
+        .import-result-msg {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 12px 14px;
+          border-radius: 10px;
+          font-size: 13px;
+          background: hsl(142, 60%, 92%);
+          color: hsl(142, 60%, 22%);
+          border: 1px solid hsl(142, 60%, 75%);
+        }
+
+        [data-theme="dark"] .import-result-msg {
+          background: hsl(142, 35%, 13%);
+          color: hsl(142, 60%, 72%);
+          border-color: hsl(142, 35%, 22%);
+        }
+
+        .import-result-msg--error {
+          background: hsl(0, 80%, 95%);
+          color: hsl(0, 65%, 32%);
+          border-color: hsl(0, 65%, 80%);
+        }
+
+        [data-theme="dark"] .import-result-msg--error {
+          background: hsl(0, 35%, 13%);
+          color: hsl(0, 60%, 72%);
+          border-color: hsl(0, 35%, 22%);
+        }
+
+        .import-result-icon {
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .import-result-detail {
+          margin-top: 2px;
+          font-size: 12px;
+          opacity: 0.8;
+        }
+
+        /* ── Import toolbar ── */
+        .import-toolbar {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+
+        @media (max-width: 640px) {
+          .export-filters-grid { grid-template-columns: 1fr; }
+          .export-toolbar { justify-content: stretch; flex-direction: column; }
+          .export-primary-btn, .export-reset-btn { width: 100%; justify-content: center; }
+          .import-toolbar { flex-direction: column; }
+          .import-toolbar button { width: 100%; justify-content: center; }
+        }
+      `}</style>
     </div>
   );
 }

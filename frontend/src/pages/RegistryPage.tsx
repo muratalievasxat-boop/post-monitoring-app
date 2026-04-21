@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { RegistryDrillDown } from "@/App";
 
 interface Rec {
   id: string;
@@ -55,21 +56,52 @@ function uniqNormalized(values?: string[]) {
   return Array.from(map.values());
 }
 
+// For cycles and types — preserve original case (Roman numerals like II, III break with normalizeLabel)
+function uniqRaw(values?: string[]) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const v of values || []) {
+    const t = v.trim();
+    if (t && !seen.has(t)) {
+      seen.add(t);
+      result.push(t);
+    }
+  }
+  return result;
+}
+
 function statusClass(status?: string) {
   const s = (status || "").toLowerCase();
   if (s.includes("исполн")) return "status status-done";
   if (s.includes("работ")) return "status status-work";
+  if (s.includes("снятия с контроля")) return "status status-work";
   if (s.includes("не поддерж") || s.includes("отклон")) return "status status-bad";
   return "status status-neutral";
 }
 
-export default function RegistryPage() {
+interface RegistryPageProps {
+  drillDown?: RegistryDrillDown | null;
+  onDrillDownApplied?: () => void;
+}
+
+export default function RegistryPage({ drillDown, onDrillDownApplied }: RegistryPageProps = {}) {
   const [search, setSearch] = useState("");
   const [cycle, setCycle] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [sphere, setSphere] = useState(ALL);
   const [type, setType] = useState(ALL);
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    if (!drillDown) return;
+    if (drillDown.search !== undefined) setSearch(drillDown.search);
+    if (drillDown.cycle !== undefined) setCycle(drillDown.cycle);
+    if (drillDown.status !== undefined) setStatus(drillDown.status);
+    if (drillDown.sphere !== undefined) setSphere(drillDown.sphere);
+    setPage(1);
+    onDrillDownApplied?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drillDown]);
 
   const [detailItem, setDetailItem] = useState<Rec | null>(null);
   const [editItem, setEditItem] = useState<Rec | null>(null);
@@ -86,7 +118,7 @@ export default function RegistryPage() {
       pageSize: 100,
     });
 
-    if (search) p.set("search", search);
+    if (search) p.set("q", search);
     if (cycle !== ALL) p.set("cycle", cycle);
     if (status !== ALL) p.set("status", status);
     if (sphere !== ALL) p.set("sphere", sphere);
@@ -112,9 +144,9 @@ export default function RegistryPage() {
   const totalPages = data?.pages ?? 1;
 
   const normalizedStatuses = uniqNormalized(filters?.statuses);
-  const normalizedTypes = uniqNormalized(filters?.types);
   const normalizedSpheres = uniqNormalized(filters?.spheres);
-  const normalizedCycles = uniqNormalized(filters?.cycles);
+  const rawCycles = uniqRaw(filters?.cycles);
+  const rawTypes = uniqRaw(filters?.types);
 
   const mutation = useMutation({
     mutationFn: (payload: any) =>
@@ -173,7 +205,7 @@ export default function RegistryPage() {
 
         <select className="filter-select" value={cycle} onChange={(e) => { setCycle(e.target.value); setPage(1); }}>
           <option value={ALL}>Все циклы</option>
-          {normalizedCycles.map((item) => (
+          {rawCycles.map((item) => (
             <option key={item} value={item}>Цикл {item}</option>
           ))}
         </select>
@@ -194,7 +226,7 @@ export default function RegistryPage() {
 
         <select className="filter-select" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
           <option value={ALL}>Тип: все</option>
-          {normalizedTypes.map((item) => (
+          {rawTypes.map((item) => (
             <option key={item} value={item}>{item}</option>
           ))}
         </select>
@@ -386,8 +418,8 @@ export default function RegistryPage() {
                 <label className="form-label">Статус</label>
                 <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
                   <option value="">Выберите статус</option>
-                  {normalizedStatuses.map((item) => (
-                    <option key={item} value={item}>{item}</option>
+                  {[...new Set([...normalizedStatuses, "Для снятия с контроля"])].map((item) => (
+                    <option key={item} value={item} style={item === "Для снятия с контроля" ? { color: "#d97706" } : undefined}>{item}</option>
                   ))}
                 </select>
               </div>
