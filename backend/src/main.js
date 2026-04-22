@@ -10,6 +10,7 @@ import adminRegistryRouter from './routes/adminRegistry.js';
 import exportRouter from './routes/export.js';
 import authRouter from './routes/auth.js';
 import casesRouter from './routes/cases.js';
+import usersRouter from './routes/users.js';
 import { pool } from './db/pool.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +69,7 @@ app.use('/api/admin/registry', adminRegistryRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/cases', casesRouter);
+app.use('/api/users', usersRouter);
 
 // Serve frontend in production
 const frontendDist = join(__dirname, '../../frontend/dist');

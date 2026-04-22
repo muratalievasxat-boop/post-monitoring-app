@@ -5,6 +5,7 @@ import RegistryPage from './pages/RegistryPage'
 import UpdatePage from './pages/UpdatePage'
 import ExportPage from './pages/ExportPage'
 import CasesPage from './pages/CasesPage'
+import UsersPage from './pages/UsersPage'
 import LoginPage, { type AuthUser } from './pages/LoginPage'
 import { Sidebar, type TabId } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
@@ -63,6 +64,7 @@ export function App() {
     : tab === 'registry' ? 'Реестр'
     : tab === 'update' ? 'Обновление'
     : tab === 'cases' ? 'Кейсы ТД'
+    : tab === 'users' ? 'Пользователи'
     : 'Администрирование'
 
   return (
@@ -81,6 +83,7 @@ export function App() {
           {tab === 'update' && <UpdatePage />}
           {tab === 'export' && <ExportPage />}
           {tab === 'cases' && <CasesPage user={auth.user} />}
+          {tab === 'users' && <UsersPage />}
         </main>
       </section>
     </div>

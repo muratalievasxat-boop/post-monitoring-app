@@ -1,8 +1,8 @@
 import React from 'react';
-import { LayoutDashboard, Table2, RefreshCw, Settings, Briefcase, LogOut } from 'lucide-react';
+import { LayoutDashboard, Table2, RefreshCw, Settings, Briefcase, LogOut, Users } from 'lucide-react';
 import type { AuthUser } from '@/pages/LoginPage';
 
-export type TabId = 'dashboard' | 'registry' | 'update' | 'export' | 'cases';
+export type TabId = 'dashboard' | 'registry' | 'update' | 'export' | 'cases' | 'users';
 
 interface SidebarProps {
   current: TabId;
@@ -20,6 +20,7 @@ const mainItems = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLogout }) => {
   const showCases = user?.role === 'admin' || user?.role === 'analyst';
+  const isAdmin = user?.role === 'admin';
 
   return (
     <aside className="sidebar">
@@ -57,6 +58,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
               <Briefcase size={16} strokeWidth={1.8} />
               <span>Кейсы ТД</span>
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className={`sidebar-item${current === 'users' ? ' active' : ''}`}
+                onClick={() => onChange('users')}
+              >
+                <Users size={16} strokeWidth={1.8} />
+                <span>Пользователи</span>
+              </button>
+            )}
           </>
         )}
       </nav>
