@@ -1,42 +1,83 @@
 import React from 'react';
-import { LayoutDashboard, Table2, RefreshCw, Settings } from 'lucide-react';
+import { LayoutDashboard, Table2, RefreshCw, Settings, Briefcase, LogOut } from 'lucide-react';
+import type { AuthUser } from '@/pages/LoginPage';
 
-type TabId = 'dashboard' | 'registry' | 'update' | 'export';
+export type TabId = 'dashboard' | 'registry' | 'update' | 'export' | 'cases';
 
 interface SidebarProps {
   current: TabId;
   onChange: (tab: TabId) => void;
+  user: AuthUser | null;
+  onLogout: () => void;
 }
 
-const items = [
+const mainItems = [
   { id: 'dashboard' as TabId, label: 'Дашборд',          icon: LayoutDashboard },
   { id: 'registry'  as TabId, label: 'Реестр',            icon: Table2 },
   { id: 'update'    as TabId, label: 'Обновление',        icon: RefreshCw },
   { id: 'export'    as TabId, label: 'Администрирование', icon: Settings },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ current, onChange }) => (
-  <aside className="sidebar">
-    <div className="sidebar-brand">
-      <div className="sidebar-brand-icon">М</div>
-      <div>
-        <div className="sidebar-brand-title">Мониторинг</div>
-        <div className="sidebar-brand-sub">Дебюрократизация</div>
-      </div>
-    </div>
+export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLogout }) => {
+  const showCases = user?.role === 'admin' || user?.role === 'analyst';
 
-    <nav className="sidebar-nav">
-      {items.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          type="button"
-          className={`sidebar-item${current === id ? ' active' : ''}`}
-          onClick={() => onChange(id)}
-        >
-          <Icon size={16} strokeWidth={1.8} />
-          <span>{label}</span>
-        </button>
-      ))}
-    </nav>
-  </aside>
-);
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <div className="sidebar-brand-icon">М</div>
+        <div>
+          <div className="sidebar-brand-title">Мониторинг</div>
+          <div className="sidebar-brand-sub">Дебюрократизация</div>
+        </div>
+      </div>
+
+      <nav className="sidebar-nav">
+        {mainItems.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            className={`sidebar-item${current === id ? ' active' : ''}`}
+            onClick={() => onChange(id)}
+          >
+            <Icon size={16} strokeWidth={1.8} />
+            <span>{label}</span>
+          </button>
+        ))}
+
+        {showCases && (
+          <>
+            <div style={{ margin: '12px 12px 4px', fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Кейсы ТД
+            </div>
+            <button
+              type="button"
+              className={`sidebar-item${current === 'cases' ? ' active' : ''}`}
+              onClick={() => onChange('cases')}
+            >
+              <Briefcase size={16} strokeWidth={1.8} />
+              <span>Кейсы ТД</span>
+            </button>
+          </>
+        )}
+      </nav>
+
+      {user && (
+        <div style={{ padding: '12px 16px', borderTop: '1px solid hsl(var(--border))', marginTop: 'auto' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'hsl(var(--foreground))', marginBottom: 2 }}>{user.name}</div>
+          <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginBottom: 8 }}>{user.role}</div>
+          <button
+            type="button"
+            onClick={onLogout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
+              cursor: 'pointer', fontSize: 12, color: 'hsl(var(--muted-foreground))', padding: 0,
+            }}
+          >
+            <LogOut size={13} />
+            Выйти
+          </button>
+        </div>
+      )}
+    </aside>
+  );
+};

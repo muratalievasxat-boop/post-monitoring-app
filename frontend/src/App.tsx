@@ -4,10 +4,10 @@ import DashboardPage from './pages/DashboardPage'
 import RegistryPage from './pages/RegistryPage'
 import UpdatePage from './pages/UpdatePage'
 import ExportPage from './pages/ExportPage'
-import { Sidebar } from './components/layout/Sidebar'
+import CasesPage from './pages/CasesPage'
+import LoginPage, { type AuthUser } from './pages/LoginPage'
+import { Sidebar, type TabId } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
-
-type TabId = 'dashboard' | 'registry' | 'update' | 'export'
 
 export interface RegistryDrillDown {
   cycle?: string
@@ -16,7 +16,15 @@ export interface RegistryDrillDown {
   search?: string
 }
 
+function loadAuth(): { token: string; user: AuthUser } | null {
+  const token = localStorage.getItem('jwt')
+  const raw = localStorage.getItem('user')
+  if (!token || !raw) return null
+  try { return { token, user: JSON.parse(raw) } } catch { return null }
+}
+
 export function App() {
+  const [auth, setAuth] = useState<{ token: string; user: AuthUser } | null>(loadAuth)
   const [tab, setTab] = useState<TabId>('dashboard')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light'
@@ -28,20 +36,38 @@ export function App() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  function handleLogin(token: string, user: AuthUser) {
+    localStorage.setItem('jwt', token)
+    localStorage.setItem('user', JSON.stringify(user))
+    setAuth({ token, user })
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('jwt')
+    localStorage.removeItem('user')
+    setAuth(null)
+    setTab('dashboard')
+  }
+
   function handleDrillDown(filter: RegistryDrillDown) {
     setDrillDown(filter)
     setTab('registry')
+  }
+
+  if (!auth) {
+    return <LoginPage onLogin={handleLogin} />
   }
 
   const title =
     tab === 'dashboard' ? 'Дашборд'
     : tab === 'registry' ? 'Реестр'
     : tab === 'update' ? 'Обновление'
+    : tab === 'cases' ? 'Кейсы ТД'
     : 'Администрирование'
 
   return (
     <div className="app-shell">
-      <Sidebar current={tab} onChange={setTab} />
+      <Sidebar current={tab} onChange={setTab} user={auth.user} onLogout={handleLogout} />
       <section className="main">
         <Topbar title={title} theme={theme} onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')} />
         <main className="page-content">
@@ -54,6 +80,7 @@ export function App() {
           )}
           {tab === 'update' && <UpdatePage />}
           {tab === 'export' && <ExportPage />}
+          {tab === 'cases' && <CasesPage user={auth.user} />}
         </main>
       </section>
     </div>

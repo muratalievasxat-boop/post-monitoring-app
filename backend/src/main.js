@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
@@ -7,9 +8,34 @@ import dashboardRouter from './routes/dashboard.js';
 import recommendationsRouter from './routes/recommendations.js';
 import adminRegistryRouter from './routes/adminRegistry.js';
 import exportRouter from './routes/export.js';
+import authRouter from './routes/auth.js';
+import casesRouter from './routes/cases.js';
 import { pool } from './db/pool.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export const TD_LIST = [
+  'город Астана',
+  'город Алматы',
+  'Акмолинская область',
+  'Актюбинская область',
+  'Алматинская область',
+  'Атырауская область',
+  'Западно-Казахстанская область',
+  'Жамбылская область',
+  'Карагандинская область',
+  'Костанайская область',
+  'Кызылординская область',
+  'Мангистауская область',
+  'Туркестанская область',
+  'Павлодарская область',
+  'Северо-Казахстанская область',
+  'Восточно-Казахстанская область',
+  'город Шымкент',
+  'Область Абай',
+  'Область Жетісу',
+  'Область Ұлытау',
+];
 
 const app = express();
 const port = process.env.PORT || 3002;
@@ -40,6 +66,8 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/admin/registry', adminRegistryRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/cases', casesRouter);
 
 // Serve frontend in production
 const frontendDist = join(__dirname, '../../frontend/dist');
@@ -52,7 +80,6 @@ if (existsSync(frontendDist)) {
 
 async function createStatusHistoryTable() {
   try {
-    // Check if old camelCase schema exists and recreate if needed
     const check = await pool.query(`
       SELECT column_name FROM information_schema.columns
       WHERE table_name = 'status_history' AND column_name = 'old_status'
@@ -75,6 +102,69 @@ async function createStatusHistoryTable() {
     }
   } catch (e) {
     console.error('[migration] status_history table creation failed:', e.message);
+  }
+}
+
+async function createCasesTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin', 'analyst', 'td')),
+        td_name TEXT,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cases (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        sphere TEXT,
+        problem TEXT,
+        problem_description TEXT,
+        solution TEXT,
+        npa_refs TEXT,
+        measurable_effect JSONB,
+        td_name TEXT,
+        submitted_by INTEGER REFERENCES users(id),
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','pending','in_review','returned','accepted','rejected')),
+        analyst_comment TEXT,
+        auto_summary TEXT,
+        manual_summary TEXT,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS case_comments (
+        id SERIAL PRIMARY KEY,
+        case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        text TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )
+    `);
+    console.log('[migration] cases tables ready');
+  } catch (e) {
+    console.error('[migration] cases tables failed:', e.message);
+  }
+}
+
+async function createDefaultAdmin() {
+  try {
+    const existing = await pool.query("SELECT id FROM users WHERE email = 'admin@debiuro.kz'");
+    if (existing.rowCount > 0) return;
+    const hash = await bcrypt.hash('Admin123', 10);
+    await pool.query(
+      `INSERT INTO users (email, password_hash, name, role) VALUES ($1, $2, $3, $4)`,
+      ['admin@debiuro.kz', hash, 'Администратор', 'admin']
+    );
+    console.log('[migration] default admin created: admin@debiuro.kz / Admin123');
+  } catch (e) {
+    console.error('[migration] default admin creation failed:', e.message);
   }
 }
 
@@ -124,7 +214,8 @@ async function normalizeExistingStatuses() {
 app.listen(port, async () => {
   console.log(`Backend started on port ${port}`);
   await createStatusHistoryTable();
+  await createCasesTables();
+  await createDefaultAdmin();
   await renameStatus();
   await normalizeExistingStatuses();
 });
-
