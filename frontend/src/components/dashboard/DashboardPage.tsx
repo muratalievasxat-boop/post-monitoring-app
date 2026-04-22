@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { fetchDashboardSummary, DashboardSummary } from '../../api/dashboard';
+import { fetchDashboardSummary } from '../../api/dashboard';
+import type { DashboardSummary } from '../../api/dashboard';
 import { StatusKpis } from './StatusKpis';
 import { SphereChart } from './SphereChart';
 import { CycleChart } from './CycleChart';

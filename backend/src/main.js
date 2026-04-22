@@ -21,6 +21,21 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/status-history/recent', async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      select id, record_id, old_status, new_status, comment, changed_at
+      from status_history
+      order by changed_at desc
+      limit 100
+    `);
+    res.json(result.rows);
+  } catch (e) {
+    console.error('status-history/recent error:', e.message);
+    res.json([]);
+  }
+});
+
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/admin/registry', adminRegistryRouter);
@@ -33,6 +48,34 @@ if (existsSync(frontendDist)) {
   app.get('*', (_req, res) => {
     res.sendFile(join(frontendDist, 'index.html'));
   });
+}
+
+async function createStatusHistoryTable() {
+  try {
+    // Check if old camelCase schema exists and recreate if needed
+    const check = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'status_history' AND column_name = 'old_status'
+    `);
+    if (check.rowCount === 0) {
+      await pool.query(`DROP TABLE IF EXISTS status_history`);
+      await pool.query(`
+        CREATE TABLE status_history (
+          id SERIAL PRIMARY KEY,
+          record_id INTEGER NOT NULL,
+          old_status TEXT,
+          new_status TEXT,
+          comment TEXT,
+          changed_at TIMESTAMPTZ DEFAULT now()
+        )
+      `);
+      console.log('[migration] status_history table created');
+    } else {
+      console.log('[migration] status_history table ready');
+    }
+  } catch (e) {
+    console.error('[migration] status_history table creation failed:', e.message);
+  }
 }
 
 async function renameStatus() {
@@ -80,6 +123,7 @@ async function normalizeExistingStatuses() {
 
 app.listen(port, async () => {
   console.log(`Backend started on port ${port}`);
+  await createStatusHistoryTable();
   await renameStatus();
   await normalizeExistingStatuses();
 });

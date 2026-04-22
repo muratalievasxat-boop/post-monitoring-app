@@ -2,8 +2,10 @@ import express from 'express';
 import {
   getRecommendationById,
   getRecommendationFilters,
+  getStatusHistory,
   listRecommendations,
   updateRecommendationStatus,
+  bulkUpdateStatus,
 } from '../db/queries/recommendations.js';
 
 const router = express.Router();
@@ -28,6 +30,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Must be registered BEFORE /:id routes to prevent "bulk" being treated as an id
+router.patch('/bulk/status', async (req, res) => {
+  try {
+    const { ids, ...payload } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array required' });
+    }
+    const results = await bulkUpdateStatus(ids, payload);
+    res.json({ ok: true, updated: results.length });
+  } catch (error) {
+    console.error('bulk status error:', error);
+    res.status(500).json({ error: 'Failed to bulk update status' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const item = await getRecommendationById(req.params.id);
@@ -38,6 +55,16 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('recommendation detail error:', error);
     res.status(500).json({ error: 'Failed to load recommendation' });
+  }
+});
+
+router.get('/:id/history', async (req, res) => {
+  try {
+    const history = await getStatusHistory(req.params.id);
+    res.json(history);
+  } catch (error) {
+    console.error('status history error:', error);
+    res.status(500).json({ error: 'Failed to load status history' });
   }
 });
 

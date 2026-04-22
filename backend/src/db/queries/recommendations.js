@@ -190,10 +190,18 @@ export async function getRecommendationFilters() {
   `);
 
   const execs = await pool.query(`
-    select distinct btrim("responsible") as responsible_org
-    from recommendations
-    where coalesce(btrim("responsible"), '') <> '' and "responsible" not ilike '%object%'
+    select distinct btrim(responsible_org) as responsible_org
+    from registry_records
+    where coalesce(btrim(responsible_org), '') <> ''
     order by 1
+    limit 200
+  `);
+
+  const overdueRes = await pool.query(`
+    select count(*)::int as count
+    from registry_records
+    where ${statusNormSql} like 'в работе%'
+      and due_raw like '%2024%'
   `);
 
   return {
@@ -202,6 +210,7 @@ export async function getRecommendationFilters() {
     spheres: spheres.rows.map(r => r.sphere),
     types: types.rows.map(r => r.record_type),
     execs: execs.rows.map(r => r.responsible_org),
+    overdueCount: overdueRes.rows[0]?.count ?? 0,
   };
 }
 
@@ -211,6 +220,7 @@ export async function listRecommendations(params) {
   const status = params.status || '';
   const sphere = params.sphere || '';
   const type = params.type || '';
+  const overdue = params.overdue === '1';
   const page = Math.max(Number(params.page || 1), 1);
   const limit = Math.min(Number(params.limit || params.pageSize || 100), 500);
   const offset = (page - 1) * limit;
@@ -248,6 +258,11 @@ export async function listRecommendations(params) {
   if (type) {
     values.push(type.trim());
     where.push(`btrim(coalesce(record_type,'')) = $${values.length}`);
+  }
+
+  if (overdue) {
+    where.push(`${statusNormSql} like 'в работе%'`);
+    where.push(`due_raw like '%2024%'`);
   }
 
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
@@ -331,6 +346,17 @@ export async function getRecommendationById(id) {
   return row;
 }
 
+export async function getStatusHistory(id) {
+  const res = await pool.query(`
+    select id, old_status, new_status, comment, changed_at
+    from status_history
+    where record_id = $1
+    order by changed_at desc
+    limit 50
+  `, [id]);
+  return res.rows;
+}
+
 function normalizeStatusValue(raw) {
   const v = String(raw || '').trim();
   if (!v) return null;
@@ -338,13 +364,20 @@ function normalizeStatusValue(raw) {
 }
 
 export async function updateRecommendationStatus(id, payload) {
-  // Frontend sends `status`, backend field is status_normalized — accept both
   const rawStatus = payload.status ?? payload.status_normalized ?? null;
   const status_normalized = normalizeStatusValue(rawStatus);
   const due_raw = payload.deadline?.trim() || payload.due_raw?.trim() || null;
   const position_go_2026_03_27 = payload.position2026 ?? payload.position_go_2026_03_27 ?? null;
   const position_adgs = payload.adgsPosition ?? payload.position_adgs ?? null;
   const comment = payload.comment ?? null;
+
+  // Fetch old status for history
+  const oldRes = await pool.query(
+    'select status_normalized from registry_records where id = $1',
+    [id]
+  );
+  if (!oldRes.rows[0]) return null;
+  const old_status = oldRes.rows[0].status_normalized;
 
   const res = await pool.query(`
     update registry_records
@@ -358,14 +391,27 @@ export async function updateRecommendationStatus(id, payload) {
       updated_at = now()
     where id = $1
     returning id
-  `, [
-    id,
-    status_normalized,
-    due_raw,
-    position_go_2026_03_27,
-    position_adgs,
-    comment,
-  ]);
+  `, [id, status_normalized, due_raw, position_go_2026_03_27, position_adgs, comment]);
 
-  return res.rows[0] || null;
+  if (!res.rows[0]) return null;
+
+  try {
+    await pool.query(
+      'insert into status_history (record_id, old_status, new_status, comment) values ($1, $2, $3, $4)',
+      [id, old_status, status_normalized, comment]
+    );
+  } catch (e) {
+    console.error('[history] Failed to write status history:', e.message);
+  }
+
+  return res.rows[0];
+}
+
+export async function bulkUpdateStatus(ids, payload) {
+  const results = [];
+  for (const id of ids) {
+    const r = await updateRecommendationStatus(id, payload);
+    if (r) results.push(r);
+  }
+  return results;
 }

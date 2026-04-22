@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, Component, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -7,10 +7,23 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
-import { CheckCircle2, Clock, XCircle, Ban, ListChecks, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, Ban, ListChecks } from "lucide-react";
 import type { RegistryDrillDown } from "@/App";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
+
+class ChartErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) { return { error: e.message }; }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: "16px", color: "#dc2626", fontSize: 12, background: "#fef2f2", borderRadius: 8, border: "1px solid #fca5a5" }}>
+        Ошибка графика: {this.state.error}
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 interface DashboardSummary {
   totals: { all: number; active: number; done: number; rejected: number; excluded: number; unknown: number; overdue: number };
@@ -53,7 +66,7 @@ function KpiCard({ label, value, pct, sub, icon: Icon, tone, selected, onClick }
     >
       <div>
         <div style={{ fontSize: 11, fontWeight: 600, color: "var(--kc-accent)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
-        <div style={{ fontSize: 28, fontWeight: 700, color: "hsl(var(--foreground))", lineHeight: 1 }}>{value.toLocaleString("ru")}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: "hsl(var(--foreground))", lineHeight: 1 }}>{(value ?? 0).toLocaleString("ru")}</div>
         {pct !== undefined && (
           <div style={{ fontSize: 12, color: "var(--kc-accent)", marginTop: 3, fontWeight: 600 }}>{pct}%</div>
         )}
@@ -107,11 +120,12 @@ function HBarChart({ labels, values, color, isCount, onClickLabel }: {
           plugins: {
             legend: { display: false },
             datalabels: {
+              display: false,
               anchor: "end" as const, align: "end" as const, offset: 2,
               color, font: { size: 10, weight: "bold" as const },
               formatter: (v: number) => isCount ? v : v + "%",
             },
-            tooltip: { callbacks: { label: (ctx: any) => isCount ? ` ${ctx.parsed.x}` : ` ${ctx.parsed.x}%` } },
+            tooltip: { callbacks: { label: (ctx: any) => isCount ? ` ${ctx.parsed?.x ?? 0}` : ` ${ctx.parsed?.x ?? 0}%` } },
           },
         }}
       />
@@ -119,78 +133,16 @@ function HBarChart({ labels, values, color, isCount, onClickLabel }: {
   );
 }
 
-function StackedHBarChart({ items, onClickLabel }: {
-  items: { label: string; done: number; total: number; pct: number }[];
-  onClickLabel?: (label: string) => void;
-}) {
-  const labels = items.map(x => x.label);
-  const h = Math.max(120, items.length * 34 + 70);
-  return (
-    <div style={{ height: h, position: "relative" }}>
-      <Bar
-        data={{
-          labels,
-          datasets: [
-            { label: "Исполнено", data: items.map(x => x.done), backgroundColor: C.done + "cc", hoverBackgroundColor: C.done, stack: "s", borderRadius: 2 },
-            { label: "Не исполнено", data: items.map(x => x.total - x.done), backgroundColor: "#94a3b888", hoverBackgroundColor: "#94a3b8", stack: "s", borderRadius: 2 },
-          ],
-        }}
-        options={{
-          indexAxis: "y" as const,
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: { padding: { right: 8 } },
-          onClick: (_: any, elements: any[]) => {
-            if (!elements.length || !onClickLabel) return;
-            onClickLabel(labels[elements[0].index]);
-          },
-          onHover: (event: any, elements: any[]) => {
-            const canvas = event.native?.target as HTMLCanvasElement;
-            if (canvas) canvas.style.cursor = elements.length && onClickLabel ? "pointer" : "default";
-          },
-          scales: {
-            x: { stacked: true, border: { display: false }, grid: { color: "rgba(100,116,139,0.12)" }, ticks: { color: "#64748b", font: { size: 10 } } },
-            y: {
-              stacked: true, border: { display: false }, grid: { display: false },
-              ticks: {
-                color: "#64748b", font: { size: 10 },
-                callback: (_: any, i: number) => { const l = labels[i] || ""; return l.length > 28 ? l.slice(0, 26) + "…" : l; },
-              },
-            },
-          },
-          plugins: {
-            legend: { display: true, position: "top" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
-            datalabels: {
-              display: (ctx: any) => ctx.datasetIndex === 0 && (items[ctx.dataIndex]?.done ?? 0) > 0,
-              anchor: "center" as const, align: "center" as const,
-              color: "#fff", font: { size: 10, weight: "bold" as const },
-              formatter: (_v: number, ctx: any) => { const it = items[ctx.dataIndex]; return it ? it.pct + "%" : ""; },
-            },
-            tooltip: {
-              callbacks: {
-                label: (ctx: any) => {
-                  const it = items[ctx.dataIndex];
-                  if (!it) return "";
-                  return ctx.datasetIndex === 0 ? ` Исполнено: ${it.done} (${it.pct}%)` : ` Не исполнено: ${it.total - it.done}`;
-                },
-              },
-            },
-          },
-        }}
-      />
-    </div>
-  );
-}
 
-const CYCLE_STATUS_LABELS = ["Исполнено", "В работе", "Отклонено", "Исключено"] as const;
+const CYCLE_STATUS_LABELS = ["Исполнено", "В работе", "Для снятия с контроля"] as const;
 
-type StatusFilter = "В работе" | "Исполнено" | "Отклонено" | "Исключено" | null;
+type StatusFilter = "В работе" | "Исполнено" | "Для снятия с контроля" | null;
 
 const STATUS_KEY_MAP: Record<string, keyof DashboardSummary["byCycleStatus"][0]> = {
-  "Исполнено": "done", "В работе": "active", "Отклонено": "rejected", "Исключено": "excluded",
+  "Исполнено": "done", "В работе": "active", "Для снятия с контроля": "excluded",
 };
 const STATUS_COLOR_MAP: Record<string, string> = {
-  "Исполнено": C.done, "В работе": C.active, "Отклонено": C.rejected, "Исключено": C.excluded,
+  "Исполнено": C.done, "В работе": C.active, "Для снятия с контроля": C.excluded,
 };
 
 export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: RegistryDrillDown) => void }) {
@@ -210,7 +162,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
     if (!elements.length || !onDrillDown || !stats) return;
     const { datasetIndex, index } = elements[0];
     const cycle = stats.byCycleStatus[index]?.cycle;
-    const status = CYCLE_STATUS_LABELS[datasetIndex as 0 | 1 | 2 | 3];
+    const status = CYCLE_STATUS_LABELS[datasetIndex as 0 | 1 | 2];
     if (cycle) onDrillDown({ cycle, status });
   }, [stats, onDrillDown]);
 
@@ -235,8 +187,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       datasets: [
         { label: "Исполнено", data: items.map(x => x.done), backgroundColor: C.done, stack: "s" },
         { label: "В работе", data: items.map(x => x.active), backgroundColor: C.active, stack: "s" },
-        { label: "Отклонено", data: items.map(x => x.rejected), backgroundColor: C.rejected, stack: "s" },
-        { label: "Исключено", data: items.map(x => x.excluded), backgroundColor: C.excluded, stack: "s" },
+        { label: "Для снятия с контроля", data: items.map(x => x.excluded), backgroundColor: C.excluded, stack: "s" },
       ],
     };
   }, [stats, selectedStatus]);
@@ -265,24 +216,19 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
   if (isLoading) return <div className="content"><div className="card" style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Загрузка...</div></div>;
   if (error || !stats) return <div className="card error">Не удалось загрузить данные.</div>;
 
-  const completionFormItems = (stats.byCompletionForm ?? []).map(r => ({ label: r.completion_form, done: r.done, total: r.total, pct: r.pct }));
-
   return (
     <div className="content" style={{ gap: 16 }}>
 
       {/* KPI */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
         <KpiCard label="Всего" value={stats.totals.all} icon={ListChecks} tone="blue"
           selected={selectedStatus === null} onClick={() => setSelectedStatus(null)} />
-        <KpiCard label="В работе" value={stats.totals.active} pct={pct(stats.totals.active)} icon={Clock} tone="amber"
+        <KpiCard label="В работе" value={stats.totals.active + (stats.totals.rejected ?? 0)} pct={pct(stats.totals.active + (stats.totals.rejected ?? 0))} icon={Clock} tone="amber"
           selected={selectedStatus === "В работе"} onClick={() => toggleStatus("В работе")} />
         <KpiCard label="Исполнено" value={stats.totals.done} pct={pct(stats.totals.done)} icon={CheckCircle2} tone="green"
           selected={selectedStatus === "Исполнено"} onClick={() => toggleStatus("Исполнено")} />
-        <KpiCard label="Отклонено" value={stats.totals.rejected} pct={pct(stats.totals.rejected)} icon={XCircle} tone="red"
-          selected={selectedStatus === "Отклонено"} onClick={() => toggleStatus("Отклонено")} />
-        <KpiCard label="Исключено" value={stats.totals.excluded} pct={pct(stats.totals.excluded)} icon={Ban} tone="slate"
-          selected={selectedStatus === "Исключено"} onClick={() => toggleStatus("Исключено")} />
-        <KpiCard label="Просроченные" value={stats.totals.overdue} sub="срок прошёл, не исп." icon={AlertCircle} tone="violet" />
+        <KpiCard label="Для снятия с контроля" value={stats.totals.excluded} pct={pct(stats.totals.excluded)} icon={Ban} tone="slate"
+          selected={selectedStatus === "Для снятия с контроля"} onClick={() => toggleStatus("Для снятия с контроля")} />
       </div>
 
       {selectedStatus && (
@@ -300,13 +246,13 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
           <span style={{ fontSize: 13, color: "hsl(var(--muted-foreground))" }}>{stats.totals.done} из {stats.totals.all} · <strong style={{ color: "#16a34a" }}>{overallPct}%</strong></span>
         </div>
         <div style={{ height: 14, background: "hsl(var(--border))", borderRadius: 8, overflow: "hidden", display: "flex" }}>
-          {[{ val: stats.totals.done, color: C.done }, { val: stats.totals.active, color: C.active }, { val: stats.totals.rejected, color: C.rejected }, { val: stats.totals.excluded, color: C.excluded }]
+          {[{ val: stats.totals.done, color: C.done }, { val: stats.totals.active + (stats.totals.rejected ?? 0), color: C.active }, { val: stats.totals.excluded, color: C.excluded }]
             .map(({ val, color }, i) => (
-              <div key={i} style={{ width: `${(val / stats.totals.all) * 100}%`, background: color, height: "100%", transition: "width 0.5s" }} />
+              <div key={i} style={{ width: `${(val / (stats.totals.all || 1)) * 100}%`, background: color, height: "100%", transition: "width 0.5s" }} />
             ))}
         </div>
         <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap" }}>
-          {[{ label: "Исполнено", val: stats.totals.done, color: C.done }, { label: "В работе", val: stats.totals.active, color: C.active }, { label: "Отклонено", val: stats.totals.rejected, color: C.rejected }, { label: "Исключено", val: stats.totals.excluded, color: C.excluded }]
+          {[{ label: "Исполнено", val: stats.totals.done, color: C.done }, { label: "В работе", val: stats.totals.active + (stats.totals.rejected ?? 0), color: C.active }, { label: "Для снятия с контроля", val: stats.totals.excluded, color: C.excluded }]
             .map(({ label, val, color }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <div style={{ width: 9, height: 9, borderRadius: 2, background: color }} />
@@ -325,7 +271,8 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             <div className="card-title">Исполнение по циклам</div>
             <div className="card-meta">{onDrillDown ? "Нажмите на столбец — откроется список рекомендаций" : "Структура статусов"}</div>
           </div>
-          <Bar data={cycleStackedData} options={{
+          <ChartErrorBoundary>
+          <Bar key={`cycle-bar-${selectedStatus ?? "all"}`} data={cycleStackedData} options={{
             responsive: true, maintainAspectRatio: true,
             onClick: handleCycleChartClick,
             onHover: (event: any, elements: any[]) => {
@@ -334,17 +281,14 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             },
             plugins: {
               legend: { display: true, position: "bottom" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
-              datalabels: {
-                display: (ctx: any) => (ctx.parsed.y ?? 0) >= 10,
-                color: "#fff", font: { size: 10, weight: "bold" as const },
-                formatter: (v: number) => v > 0 ? v : "",
-              },
+              datalabels: { display: false },
             },
             scales: {
               x: { stacked: true, ticks: { color: "#64748b", font: { size: 11 } } },
               y: { stacked: true, ticks: { color: "#64748b", font: { size: 11 } } },
             },
           }} />
+          </ChartErrorBoundary>
         </div>
 
         {/* % исполнения по типам — Line chart */}
@@ -353,7 +297,8 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             <div className="card-title">% исполнения по циклам</div>
             <div className="card-meta">{onDrillDown ? "Нажмите на цикл — увидите все рекомендации этого цикла" : "Анализ vs Мониторинг — динамика"}</div>
           </div>
-          <Line data={cycleLineData} options={{
+          <ChartErrorBoundary>
+          <Line key="line-type-completion" data={cycleLineData} options={{
             responsive: true, maintainAspectRatio: true,
             onClick: handleLineChartClick,
             onHover: (event: any, elements: any[]) => {
@@ -362,32 +307,16 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             },
             plugins: {
               legend: { display: true, position: "bottom" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
-              datalabels: {
-                display: true,
-                color: (ctx: any) => (ctx.dataset as any).borderColor,
-                align: "top" as const, offset: 4,
-                font: { size: 9, weight: "bold" as const },
-                formatter: (v: number) => v + "%",
-              },
+              datalabels: { display: false },
             },
             scales: {
               x: { ticks: { color: "#64748b", font: { size: 11 } } },
               y: { min: 0, max: 100, ticks: { color: "#64748b", font: { size: 11 }, callback: (v: any) => v + "%" } },
             },
           }} />
+          </ChartErrorBoundary>
         </div>
       </div>
-
-      {/* Эффективность по форме завершения */}
-      {completionFormItems.length > 0 && (
-        <div className="card chart-card">
-          <div className="card-title-row">
-            <div className="card-title">Эффективность по форме завершения</div>
-            <div className="card-meta">Как уровень адресата влияет на % исполнения</div>
-          </div>
-          <StackedHBarChart items={completionFormItems} />
-        </div>
-      )}
 
       {/* Лидеры ГО + Просроченные по исполнителям */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -396,18 +325,21 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             <div className="card-title">🏆 Лидеры ГО</div>
             <div className="card-meta">по % исполнения</div>
           </div>
+          <ChartErrorBoundary>
           <HBarChart
             labels={(stats.byOrgStatus ?? []).map(r => r.responsible_org)}
             values={(stats.byOrgStatus ?? []).map(r => r.pct)}
             color={C.done}
             onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
           />
+          </ChartErrorBoundary>
         </div>
         <div className="card chart-card">
           <div className="card-title-row">
             <div className="card-title">🔴 Просроченные по исполнителям</div>
             <div className="card-meta">Срок истёк в 2024–2025, статус — «В работе»</div>
           </div>
+          <ChartErrorBoundary>
           <HBarChart
             labels={(stats.byOverdueOrg ?? []).map(r => r.responsible_org)}
             values={(stats.byOverdueOrg ?? []).map(r => r.overdue_count)}
@@ -415,6 +347,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             isCount
             onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
           />
+          </ChartErrorBoundary>
         </div>
       </div>
 
@@ -425,12 +358,14 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             <div className="card-title">🏆 Лидеры по сферам</div>
             <div className="card-meta">по % исполнения</div>
           </div>
+          <ChartErrorBoundary>
           <HBarChart
             labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
             values={(stats.bySphereStatus ?? []).map(r => r.pct)}
             color={C.analiz}
             onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
           />
+          </ChartErrorBoundary>
         </div>
         <div className="card">
           <div className="card-title-row">
