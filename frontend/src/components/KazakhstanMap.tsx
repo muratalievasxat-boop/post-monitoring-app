@@ -12,23 +12,49 @@ interface Props {
   onClickRegion: (tdName: string) => void;
 }
 
-// Maps SVG path index → TD name (by geographic centroid analysis, viewBox 3000×1700)
-// Paths #2,#9,#10,#12,#17-21 are water bodies / tiny islands — skipped
+// Maps SVG path index → TD name (viewBox 3000×1700, geo: 50–87.4°E, 40.5–55.4°N)
+// Paths #2,#9,#10,#12,#17-21 are water bodies / tiny islands — not interactive
+// Paths #1, #5, #14 cover multiple current oblasts → resolved by mouse SVG-coordinates
 const REGION_MAP: Record<number, string> = {
-  0:  'Северо-Казахстанская область',   // (71.7°E, 53.4°N)
-  1:  'Актюбинская область',            // (63.7°E, 50.7°N) large western
-  3:  'Павлодарская область',           // (76.6°E, 51.7°N) ✓ Pavlodar
-  4:  'Акмолинская область',            // (71.4°E, 51.5°N) ✓ Astana
-  5:  'Западно-Казахстанская область',  // (55.0°E, 47.3°N) west coast
-  6:  'Область Абай',                   // (80.3°E, 49.1°N) east, Semey
-  7:  'Карагандинская область',         // (74.5°E, 49.3°N) ✓ Karaganda
-  8:  'Восточно-Казахстанская область', // (84.5°E, 49.1°N) far east
-  11: 'Область Ұлытау',                 // (69.8°E, 48.2°N) center, Zhezkazgan
-  13: 'Кызылординская область',         // (66.5°E, 45.3°N) ✓ Kyzylorda
-  14: 'Алматинская область',            // (79.0°E, 44.6°N) south-east
-  15: 'Туркестанская область',          // (70.4°E, 43.1°N) ✓ Shymkent
-  16: 'Жамбылская область',             // (73.8°E, 43.7°N) ✓ Taraz
+  0:  'Северо-Казахстанская область',   // centroid 71.7°E 53.4°N
+  1:  'Актюбинская область',            // split: north→Костанайская, south→Актюбинская
+  3:  'Павлодарская область',           // centroid 76.6°E 51.7°N ✓
+  4:  'Акмолинская область',            // centroid 71.4°E 51.5°N ✓ Astana
+  5:  'Западно-Казахстанская область',  // split: north→ЗКО, mid→Атырауская, south→Мангистауская
+  6:  'Область Абай',                   // centroid 80.3°E 49.1°N
+  7:  'Карагандинская область',         // centroid 74.5°E 49.3°N ✓
+  8:  'Восточно-Казахстанская область', // centroid 84.5°E 49.1°N
+  11: 'Область Ұлытау',                 // centroid 69.8°E 48.2°N
+  13: 'Кызылординская область',         // centroid 66.5°E 45.3°N ✓
+  14: 'Алматинская область',            // split: north→Жетісу, south→Алматинская
+  15: 'Туркестанская область',          // centroid 70.4°E 43.1°N ✓
+  16: 'Жамбылская область',             // centroid 73.8°E 43.7°N ✓
 };
+
+// Convert SVG pixel → geographic latitude (viewBox 3000×1700, N=55.4°, S=40.5°)
+function svgYtoLat(y: number): number { return 55.4 - (y / 1700) * 14.9; }
+
+// For paths that cover multiple current oblasts, resolve by mouse lat position
+function resolveRegion(pathIdx: number, svgY: number): string | null {
+  if (pathIdx === 5) {
+    // Path covers western coastal strip: ЗКО (north) → Атырауская → Мангистауская (south)
+    const lat = svgYtoLat(svgY);
+    if (lat >= 49) return 'Западно-Казахстанская область'; // ~49–52.5°N
+    if (lat >= 46) return 'Атырауская область';            // ~46–49°N
+    return 'Мангистауская область';                        // ~42–46°N
+  }
+  if (pathIdx === 1) {
+    // Path covers Костанайская (north) + Актюбинская (south)
+    const lat = svgYtoLat(svgY);
+    return lat >= 51.5 ? 'Костанайская область' : 'Актюбинская область';
+  }
+  if (pathIdx === 14) {
+    // Path covers Жетісу (north, Taldykorgan ~45°N) + Алматинская (south)
+    const lat = svgYtoLat(svgY);
+    return lat >= 44.5 ? 'Область Жетісу' : 'Алматинская область';
+  }
+  return REGION_MAP[pathIdx] ?? null;
+}
 
 // Cities as circles (approximate SVG coords 3000×1700)
 const CITIES = [
@@ -79,29 +105,46 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
       });
   }, []);
 
-  function svgXY(e: React.MouseEvent): { x: number; y: number } {
+  // Client px → screen-relative px (for tooltip position)
+  function clientXY(e: React.MouseEvent): { x: number; y: number } {
     const rect = svgRef.current!.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
+  // Client px → SVG viewBox coordinates (0–3000, 0–1700)
+  function toSvgCoords(e: React.MouseEvent): { svgX: number; svgY: number } {
+    const svg = svgRef.current!;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM()!.inverse());
+    return { svgX: p.x, svgY: p.y };
+  }
+
   function handlePathEnter(e: React.MouseEvent, idx: number) {
-    const tdName = REGION_MAP[idx];
+    if (!(idx in REGION_MAP)) return;
+    const { svgY } = toSvgCoords(e);
+    const tdName = resolveRegion(idx, svgY);
     if (!tdName) return;
     setHovered(idx);
-    const { x, y } = svgXY(e);
+    const { x, y } = clientXY(e);
     setTooltip({ x, y, tdName });
   }
 
-  function handlePathMove(e: React.MouseEvent) {
-    if (tooltip) {
-      const { x, y } = svgXY(e);
+  function handlePathMove(e: React.MouseEvent, idx?: number) {
+    const { x, y } = clientXY(e);
+    if (idx !== undefined && idx in REGION_MAP) {
+      const { svgY } = toSvgCoords(e);
+      const tdName = resolveRegion(idx, svgY);
+      if (tdName) setTooltip(t => t ? { ...t, x, y, tdName } : null);
+    } else {
       setTooltip(t => t ? { ...t, x, y } : null);
     }
   }
 
   function handleCityEnter(e: React.MouseEvent, tdName: string) {
     setHoveredCity(tdName);
-    const { x, y } = svgXY(e);
+    const { x, y } = clientXY(e);
     setTooltip({ x, y, tdName });
   }
 
@@ -129,10 +172,13 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
 
         {/* Interactive region paths */}
         {regionPaths.map(p => {
-          const tdName = REGION_MAP[p.index]!;
-          const stat   = statMap.get(tdName);
-          const fill   = scoreColor(stat?.score);
-          const isHov  = hovered === p.index;
+          // For multi-region paths use a neutral color; real color shown in tooltip
+          // For single-region paths use the stat color directly
+          const isMulti = p.index === 1 || p.index === 5 || p.index === 14;
+          const singleName = isMulti ? null : REGION_MAP[p.index]!;
+          const stat = singleName ? statMap.get(singleName) : undefined;
+          const fill = scoreColor(stat?.score);
+          const isHov = hovered === p.index;
           return (
             <path
               key={p.index}
@@ -143,9 +189,13 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
               strokeWidth={isHov ? 4 : 2}
               style={{ cursor: 'pointer', transition: 'fill-opacity 0.12s, stroke-width 0.12s' }}
               onMouseEnter={e => handlePathEnter(e, p.index)}
-              onMouseMove={handlePathMove}
+              onMouseMove={e => handlePathMove(e, p.index)}
               onMouseLeave={handleLeave}
-              onClick={() => onClickRegion(tdName)}
+              onClick={e => {
+                const { svgY } = toSvgCoords(e);
+                const name = resolveRegion(p.index, svgY);
+                if (name) onClickRegion(name);
+              }}
             />
           );
         })}
