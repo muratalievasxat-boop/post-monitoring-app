@@ -202,6 +202,31 @@ async function renameStatus() {
   }
 }
 
+async function normalizeSpecificStatuses() {
+  const map = [
+    ['в работе', 'В работе'],
+    ['исполнено', 'Исполнено'],
+    ['для снятия с контроля', 'Для снятия с контроля'],
+  ];
+  try {
+    let total = 0;
+    for (const [from, to] of map) {
+      const r = await pool.query(
+        `UPDATE registry_records SET status_normalized = $2, status_raw = $2
+         WHERE lower(btrim(status_normalized)) = $1 AND status_normalized <> $2`,
+        [from, to],
+      );
+      if (r.rowCount > 0) {
+        console.log(`[migration] "${from}" → "${to}": ${r.rowCount} rows`);
+        total += r.rowCount;
+      }
+    }
+    if (total === 0) console.log('[migration] normalizeSpecificStatuses: nothing to update');
+  } catch (e) {
+    console.error('[migration] normalizeSpecificStatuses failed:', e.message);
+  }
+}
+
 async function normalizeExistingStatuses() {
   try {
     const result = await pool.query(`
@@ -235,5 +260,6 @@ app.listen(port, async () => {
   await createTdSummariesTable();
   await createDefaultAdmin();
   await renameStatus();
+  await normalizeSpecificStatuses();
   await normalizeExistingStatuses();
 });

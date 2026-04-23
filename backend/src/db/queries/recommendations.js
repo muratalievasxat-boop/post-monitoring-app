@@ -17,14 +17,14 @@ function normalizeStatusGroup(status) {
 const statusNormSql = `btrim(lower(coalesce(status_normalized, '')))`;
 
 export async function getDashboardSummary() {
-  const excludedSql = `(${statusNormSql} like '%исключ%' or ${statusNormSql} = 'для снятия с контроля')`;
+  const excludedSql = `(${statusNormSql} like '%исключ%')`;
 
   const totalsRes = await pool.query(`
     select
       count(*)::int as all,
       count(*) filter (where ${statusNormSql} like 'в работе%')::int as active,
       count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
-      count(*) filter (where ${statusNormSql} like 'не поддерживается%')::int as rejected,
+      count(*) filter (where ${statusNormSql} like 'не поддерживается%' or ${statusNormSql} = 'для снятия с контроля')::int as rejected,
       count(*) filter (where ${excludedSql})::int as excluded,
       count(*) filter (where ${statusNormSql} = '')::int as unknown,
       count(*) filter (
@@ -46,7 +46,7 @@ export async function getDashboardSummary() {
       coalesce(nullif(btrim(cycle), ''), 'Без цикла') as cycle,
       count(*) filter (where ${statusNormSql} = 'исполнено')::int as done,
       count(*) filter (where ${statusNormSql} like 'в работе%')::int as active,
-      count(*) filter (where ${statusNormSql} like 'не поддерживается%')::int as rejected,
+      count(*) filter (where ${statusNormSql} like 'не поддерживается%' or ${statusNormSql} = 'для снятия с контроля')::int as rejected,
       count(*) filter (where ${excludedSql})::int as excluded,
       count(*)::int as total
     from registry_records

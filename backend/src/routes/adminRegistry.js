@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
+import crypto from 'crypto';
 import { pool } from '../db/pool.js';
 
 
@@ -14,9 +15,16 @@ function norm(v) {
 }
 
 
+const STATUS_MAP = {
+  'не поддерживается - исключить': 'Для снятия с контроля',
+  'не поддерживается': 'Для снятия с контроля',
+};
+
 function normalizeStatus(statusRaw) {
   const v = norm(statusRaw);
   if (!v) return '';
+  const lower = v.toLowerCase().trim();
+  if (STATUS_MAP[lower]) return STATUS_MAP[lower];
   return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
 }
 
@@ -46,6 +54,25 @@ router.post('/import', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Файл не передан' });
     }
 
+    const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS import_hashes (
+        hash TEXT PRIMARY KEY,
+        filename TEXT,
+        imported_at TIMESTAMPTZ DEFAULT now()
+      )
+    `);
+
+    const existing = await pool.query('SELECT filename, imported_at FROM import_hashes WHERE hash = $1', [fileHash]);
+    if (existing.rowCount > 0) {
+      const row = existing.rows[0];
+      const when = new Date(row.imported_at).toLocaleString('ru', { timeZone: 'Asia/Almaty' });
+      return res.status(409).json({
+        error: `Этот файл уже был загружен (${row.filename || 'файл'}, ${when})`,
+        duplicate: true,
+      });
+    }
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
@@ -145,6 +172,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
 
       await client.query('commit');
+      await pool.query(
+        'INSERT INTO import_hashes (hash, filename) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [fileHash, req.file.originalname],
+      );
       return res.json({ ok: true, rows: inserted });
     } catch (e) {
       await client.query('rollback');
