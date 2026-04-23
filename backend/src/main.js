@@ -107,6 +107,21 @@ async function createStatusHistoryTable() {
   }
 }
 
+async function createTdSummariesTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS td_summaries (
+        td_name TEXT PRIMARY KEY,
+        summary TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMPTZ DEFAULT now()
+      )
+    `);
+    console.log('[migration] td_summaries table ready');
+  } catch (e) {
+    console.error('[migration] td_summaries failed:', e.message);
+  }
+}
+
 async function createCasesTables() {
   try {
     await pool.query(`
@@ -217,6 +232,7 @@ app.listen(port, async () => {
   console.log(`Backend started on port ${port}`);
   await createStatusHistoryTable();
   await createCasesTables();
+  await createTdSummariesTable();
   await createDefaultAdmin();
   await renameStatus();
   await normalizeExistingStatuses();

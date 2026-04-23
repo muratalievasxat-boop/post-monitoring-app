@@ -1,8 +1,8 @@
 import React from 'react';
-import { LayoutDashboard, Table2, RefreshCw, Settings, Briefcase, LogOut, Users } from 'lucide-react';
+import { LayoutDashboard, Table2, RefreshCw, Settings, Briefcase, LogOut, Users, BarChart2 } from 'lucide-react';
 import type { AuthUser } from '@/pages/LoginPage';
 
-export type TabId = 'dashboard' | 'registry' | 'update' | 'export' | 'cases' | 'users';
+export type TabId = 'dashboard' | 'registry' | 'update' | 'export' | 'cases' | 'users' | 'cases-dashboard';
 
 interface SidebarProps {
   current: TabId;
@@ -19,7 +19,7 @@ const mainItems = [
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLogout }) => {
-  const showCases = user?.role === 'admin' || user?.role === 'analyst';
+  const showCases = user?.role === 'admin' || user?.role === 'analyst' || user?.role === 'td';
   const isAdmin = user?.role === 'admin';
 
   return (
@@ -58,6 +58,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
               <Briefcase size={16} strokeWidth={1.8} />
               <span>Кейсы ТД</span>
             </button>
+            {(isAdmin || user?.role === 'analyst') && (
+              <button
+                type="button"
+                className={`sidebar-item${current === 'cases-dashboard' ? ' active' : ''}`}
+                onClick={() => onChange('cases-dashboard')}
+              >
+                <BarChart2 size={16} strokeWidth={1.8} />
+                <span>Аналитика кейсов</span>
+              </button>
+            )}
             {isAdmin && (
               <button
                 type="button"

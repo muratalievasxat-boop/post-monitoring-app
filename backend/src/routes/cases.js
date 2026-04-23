@@ -5,6 +5,66 @@ import { authMiddleware, requireRole } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
+// GET /api/cases/stats — агрегированная аналитика (admin/analyst)
+router.get('/stats', requireRole('admin', 'analyst'), async (_req, res) => {
+  try {
+    const [totalsR, byTdR, bySphereR] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*)::int                                                             AS total,
+          SUM(CASE WHEN status='accepted'                   THEN 1 ELSE 0 END)::int AS accepted,
+          SUM(CASE WHEN status='rejected'                   THEN 1 ELSE 0 END)::int AS rejected,
+          SUM(CASE WHEN status IN('pending','in_review')    THEN 1 ELSE 0 END)::int AS in_review,
+          SUM(CASE WHEN status='returned'                   THEN 1 ELSE 0 END)::int AS returned
+        FROM cases
+      `),
+      pool.query(`
+        SELECT
+          c.td_name,
+          COUNT(*)::int                                                             AS total,
+          SUM(CASE WHEN c.status='accepted'                THEN 1 ELSE 0 END)::int AS accepted,
+          SUM(CASE WHEN c.status='rejected'                THEN 1 ELSE 0 END)::int AS rejected,
+          SUM(CASE WHEN c.status='returned'                THEN 1 ELSE 0 END)::int AS returned,
+          ROUND(LEAST(SUM(CASE WHEN c.status='accepted' THEN 1 ELSE 0 END) * 0.25, 2.5)::numeric, 2) AS score,
+          s.summary AS manual_summary
+        FROM cases c
+        LEFT JOIN td_summaries s ON s.td_name = c.td_name
+        WHERE c.td_name IS NOT NULL
+        GROUP BY c.td_name, s.summary
+        ORDER BY accepted DESC, total DESC
+      `),
+      pool.query(`
+        SELECT sphere, COUNT(*)::int AS count
+        FROM cases
+        WHERE status='accepted' AND sphere IS NOT NULL AND sphere <> ''
+        GROUP BY sphere
+        ORDER BY count DESC
+      `),
+    ]);
+    res.json({ totals: totalsR.rows[0], byTd: byTdR.rows, bySphere: bySphereR.rows });
+  } catch (e) {
+    console.error('GET /cases/stats error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// PATCH /api/cases/td-summary/:td_name — сохранить вывод аналитика по ТД
+router.patch('/td-summary/:td_name', requireRole('admin', 'analyst'), async (req, res) => {
+  const { summary } = req.body;
+  const tdName = decodeURIComponent(req.params.td_name);
+  try {
+    await pool.query(`
+      INSERT INTO td_summaries (td_name, summary, updated_at)
+      VALUES ($1, $2, now())
+      ON CONFLICT (td_name) DO UPDATE SET summary = $2, updated_at = now()
+    `, [tdName, summary ?? '']);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('PATCH /cases/td-summary error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // POST /api/cases — создать кейс (td only)
 router.post('/', requireRole('td'), async (req, res) => {
   const { title, sphere, problem, problem_description, solution, npa_refs, measurable_effect } = req.body;

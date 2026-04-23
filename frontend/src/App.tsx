@@ -5,6 +5,7 @@ import RegistryPage from './pages/RegistryPage'
 import UpdatePage from './pages/UpdatePage'
 import ExportPage from './pages/ExportPage'
 import CasesPage from './pages/CasesPage'
+import CasesDashboardPage from './pages/CasesDashboardPage'
 import UsersPage from './pages/UsersPage'
 import LoginPage, { type AuthUser } from './pages/LoginPage'
 import { Sidebar, type TabId } from './components/layout/Sidebar'
@@ -64,6 +65,7 @@ export function App() {
     : tab === 'registry' ? 'Реестр'
     : tab === 'update' ? 'Обновление'
     : tab === 'cases' ? 'Кейсы ТД'
+    : tab === 'cases-dashboard' ? 'Аналитика кейсов'
     : tab === 'users' ? 'Пользователи'
     : 'Администрирование'
 
@@ -83,6 +85,7 @@ export function App() {
           {tab === 'update' && <UpdatePage />}
           {tab === 'export' && <ExportPage />}
           {tab === 'cases' && <CasesPage user={auth.user} />}
+          {tab === 'cases-dashboard' && <CasesDashboardPage />}
           {tab === 'users' && <UsersPage />}
         </main>
       </section>
