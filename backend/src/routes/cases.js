@@ -5,8 +5,8 @@ import { authMiddleware, requireRole } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
-// GET /api/cases/stats — агрегированная аналитика (admin/analyst)
-router.get('/stats', requireRole('admin', 'analyst'), async (_req, res) => {
+// GET /api/cases/stats — агрегированная аналитика (admin/analyst/viewer)
+router.get('/stats', requireRole('admin', 'analyst', 'viewer'), async (_req, res) => {
   try {
     const [totalsR, byTdR, bySphereR] = await Promise.all([
       pool.query(`
@@ -142,8 +142,8 @@ router.patch('/:id/status', requireRole('admin', 'analyst'), async (req, res) =>
   }
 });
 
-// POST /api/cases/:id/comments — добавить комментарий
-router.post('/:id/comments', async (req, res) => {
+// POST /api/cases/:id/comments — добавить комментарий (viewer запрещено)
+router.post('/:id/comments', requireRole('admin', 'analyst', 'td'), async (req, res) => {
   const { text } = req.body;
   if (!text?.trim()) return res.status(400).json({ error: 'Текст комментария обязателен' });
   try {

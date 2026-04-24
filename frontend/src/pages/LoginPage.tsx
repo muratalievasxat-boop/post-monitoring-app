@@ -8,7 +8,7 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
-  role: 'admin' | 'analyst' | 'td';
+  role: 'admin' | 'analyst' | 'td' | 'viewer';
   td_name?: string;
 }
 

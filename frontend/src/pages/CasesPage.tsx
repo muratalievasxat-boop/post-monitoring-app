@@ -329,6 +329,7 @@ function CaseDetailModal({ caseId, user, onClose, onUpdated }: {
   });
 
   const isAnalyst = user.role === 'admin' || user.role === 'analyst';
+  const isViewer = user.role === 'viewer';
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '32px 16px' }}
@@ -459,22 +460,26 @@ function CaseDetailModal({ caseId, user, onClose, onUpdated }: {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <textarea
-                style={{ ...inputStyle(true), minHeight: 0, flex: 1, resize: 'none' }}
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                placeholder="Написать комментарий..."
-                rows={2}
-              />
-              <button
-                disabled={!commentText.trim() || commentMutation.isPending}
-                onClick={() => commentMutation.mutate()}
-                style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: commentText.trim() ? '#2563eb' : '#94a3b8', color: '#fff', fontWeight: 600, fontSize: 13, cursor: commentText.trim() ? 'pointer' : 'not-allowed', alignSelf: 'flex-end' }}>
-                {commentMutation.isPending ? '...' : 'Отправить'}
-              </button>
-            </div>
-            {commentError && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>{commentError}</div>}
+            {!isViewer && (
+              <>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <textarea
+                    style={{ ...inputStyle(true), minHeight: 0, flex: 1, resize: 'none' }}
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    placeholder="Написать комментарий..."
+                    rows={2}
+                  />
+                  <button
+                    disabled={!commentText.trim() || commentMutation.isPending}
+                    onClick={() => commentMutation.mutate()}
+                    style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: commentText.trim() ? '#2563eb' : '#94a3b8', color: '#fff', fontWeight: 600, fontSize: 13, cursor: commentText.trim() ? 'pointer' : 'not-allowed', alignSelf: 'flex-end' }}>
+                    {commentMutation.isPending ? '...' : 'Отправить'}
+                  </button>
+                </div>
+                {commentError && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>{commentError}</div>}
+              </>
+            )}
           </>
         ) : (
           <div style={{ fontSize: 13, color: '#dc2626' }}>Не удалось загрузить кейс</div>

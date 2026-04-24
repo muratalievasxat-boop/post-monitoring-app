@@ -1,8 +1,10 @@
 import express from 'express';
 import { getDashboardSummary } from '../db/queries/recommendations.js';
 import { pool } from '../db/pool.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
+const nonTd = requireRole('admin', 'analyst', 'viewer');
 
 router.get('/status-debug', async (_req, res) => {
   try {
@@ -20,7 +22,7 @@ router.get('/status-debug', async (_req, res) => {
   }
 });
 
-router.get('/summary', async (_req, res) => {
+router.get('/summary', authMiddleware, nonTd, async (_req, res) => {
   try {
     const data = await getDashboardSummary();
     console.log('DASHBOARD SUMMARY FROM ROUTE:', JSON.stringify(data.totals));

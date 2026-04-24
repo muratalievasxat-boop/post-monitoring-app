@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { RegistryDrillDown } from "@/App";
+import type { AuthUser } from "@/pages/LoginPage";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,9 +134,11 @@ function fmtDate(iso: string) {
 interface RegistryPageProps {
   drillDown?: RegistryDrillDown | null;
   onDrillDownApplied?: () => void;
+  user?: AuthUser | null;
 }
 
-export default function RegistryPage({ drillDown, onDrillDownApplied }: RegistryPageProps = {}) {
+export default function RegistryPage({ drillDown, onDrillDownApplied, user }: RegistryPageProps = {}) {
+  const isViewer = user?.role === 'viewer';
   // Filter state
   const [search, setSearch] = useState("");
   const [cycle, setCycle] = useState(ALL);
@@ -405,7 +408,7 @@ export default function RegistryPage({ drillDown, onDrillDownApplied }: Registry
       </div>
 
       {/* ── Bulk action panel ── */}
-      {selectedIds.size >= 2 && (
+      {selectedIds.size >= 2 && !isViewer && (
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
           padding: "8px 14px", borderRadius: 8,
@@ -448,16 +451,18 @@ export default function RegistryPage({ drillDown, onDrillDownApplied }: Registry
             <table className="data-table data-table-compact">
               <thead>
                 <tr>
-                  <th style={{ width: 32, padding: "8px 6px" }}>
-                    <input
-                      ref={selectAllRef}
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleSelectAll}
-                      style={{ cursor: "pointer" }}
-                      title={allSelected ? "Снять выбор" : "Выбрать все на странице"}
-                    />
-                  </th>
+                  {!isViewer && (
+                    <th style={{ width: 32, padding: "8px 6px" }}>
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        style={{ cursor: "pointer" }}
+                        title={allSelected ? "Снять выбор" : "Выбрать все на странице"}
+                      />
+                    </th>
+                  )}
                   <th className="col-num">№</th>
                   <th className="col-cycle">Цикл</th>
                   <th className="col-sphere">Сфера</th>
@@ -474,14 +479,16 @@ export default function RegistryPage({ drillDown, onDrillDownApplied }: Registry
                     key={item.id}
                     style={overdueFilter ? { background: "rgba(250,204,21,0.13)" } : undefined}
                   >
-                    <td style={{ padding: "6px 6px" }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(item.id)}
-                        onChange={() => toggleSelect(item.id)}
-                        style={{ cursor: "pointer" }}
-                      />
-                    </td>
+                    {!isViewer && (
+                      <td style={{ padding: "6px 6px" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => toggleSelect(item.id)}
+                          style={{ cursor: "pointer" }}
+                        />
+                      </td>
+                    )}
                     <td>{item.seq_no || item.id}</td>
                     <td>{item.cycle || "—"}</td>
                     <td>{item.sphere_normalized || "—"}</td>
@@ -492,17 +499,17 @@ export default function RegistryPage({ drillDown, onDrillDownApplied }: Registry
                     <td>{item.due_raw || "—"}</td>
                     <td style={{ position: "relative" }}>
                       <span
-                        style={statusBadgeStyle(item.status_normalized, true)}
-                        onClick={e => {
+                        style={statusBadgeStyle(item.status_normalized, !isViewer)}
+                        onClick={isViewer ? undefined : e => {
                           e.stopPropagation();
                           setOpenDropdown(openDropdown === item.id ? null : item.id);
                         }}
-                        title="Нажмите для изменения статуса"
+                        title={isViewer ? undefined : "Нажмите для изменения статуса"}
                       >
                         {normalizeLabel(item.status_normalized) || "Нет статуса"}
-                        <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>
+                        {!isViewer && <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>}
                       </span>
-                      {openDropdown === item.id && (
+                      {!isViewer && openDropdown === item.id && (
                         <div style={{
                           position: "absolute", top: "calc(100% + 4px)", left: 0,
                           zIndex: 100,
@@ -531,14 +538,14 @@ export default function RegistryPage({ drillDown, onDrillDownApplied }: Registry
                     <td>
                       <div className="action-row">
                         <button className="btn-link" onClick={() => setDetailItem(item)}>Подробнее</button>
-                        <button className="btn-link" onClick={() => openEdit(item)}>Изм.</button>
+                        {!isViewer && <button className="btn-link" onClick={() => openEdit(item)}>Изм.</button>}
                       </div>
                     </td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: "center", padding: "24px", color: "#64748b" }}>
+                    <td colSpan={isViewer ? 8 : 9} style={{ textAlign: "center", padding: "24px", color: "#64748b" }}>
                       Нет данных для отображения
                     </td>
                   </tr>

@@ -7,10 +7,15 @@ import {
   updateRecommendationStatus,
   bulkUpdateStatus,
 } from '../db/queries/recommendations.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
+router.use(authMiddleware);
 
-router.get('/filters', async (_req, res) => {
+const nonTd      = requireRole('admin', 'analyst', 'viewer');
+const adminAnalyst = requireRole('admin', 'analyst');
+
+router.get('/filters', nonTd, async (_req, res) => {
   try {
     const data = await getRecommendationFilters();
     res.json(data);
@@ -20,7 +25,7 @@ router.get('/filters', async (_req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', nonTd, async (req, res) => {
   try {
     const data = await listRecommendations(req.query);
     res.json(data);
@@ -31,7 +36,7 @@ router.get('/', async (req, res) => {
 });
 
 // Must be registered BEFORE /:id routes to prevent "bulk" being treated as an id
-router.patch('/bulk/status', async (req, res) => {
+router.patch('/bulk/status', adminAnalyst, async (req, res) => {
   try {
     const { ids, ...payload } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -45,7 +50,7 @@ router.patch('/bulk/status', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', nonTd, async (req, res) => {
   try {
     const item = await getRecommendationById(req.params.id);
     if (!item) {
@@ -58,7 +63,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.get('/:id/history', async (req, res) => {
+router.get('/:id/history', nonTd, async (req, res) => {
   try {
     const history = await getStatusHistory(req.params.id);
     res.json(history);
@@ -68,7 +73,7 @@ router.get('/:id/history', async (req, res) => {
   }
 });
 
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', adminAnalyst, async (req, res) => {
   try {
     const updated = await updateRecommendationStatus(req.params.id, req.body);
     if (!updated) {

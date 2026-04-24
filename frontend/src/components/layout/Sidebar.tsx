@@ -19,8 +19,17 @@ const mainItems = [
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLogout }) => {
-  const showCases = user?.role === 'admin' || user?.role === 'analyst' || user?.role === 'td';
-  const isAdmin = user?.role === 'admin';
+  const isTd      = user?.role === 'td';
+  const isViewer  = user?.role === 'viewer';
+  const isAdmin   = user?.role === 'admin';
+  const isAnalyst = isAdmin || user?.role === 'analyst';
+  const showCases = isAdmin || user?.role === 'analyst' || isTd || isViewer;
+
+  const visibleMainItems = mainItems.filter(({ id }) => {
+    if (isTd) return false;
+    if (isViewer) return id !== 'update' && id !== 'export';
+    return true;
+  });
 
   return (
     <aside className="sidebar">
@@ -33,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
       </div>
 
       <nav className="sidebar-nav">
-        {mainItems.map(({ id, label, icon: Icon }) => (
+        {visibleMainItems.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
@@ -58,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
               <Briefcase size={16} strokeWidth={1.8} />
               <span>Кейсы ТД</span>
             </button>
-            {(isAdmin || user?.role === 'analyst') && (
+            {(isAnalyst || isViewer) && (
               <button
                 type="button"
                 className={`sidebar-item${current === 'cases-dashboard' ? ' active' : ''}`}

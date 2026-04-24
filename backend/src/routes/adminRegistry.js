@@ -3,9 +3,11 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import crypto from 'crypto';
 import { pool } from '../db/pool.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 
 const router = express.Router();
+router.use(authMiddleware, requireRole('admin', 'analyst'));
 const upload = multer({ storage: multer.memoryStorage() });
 
 

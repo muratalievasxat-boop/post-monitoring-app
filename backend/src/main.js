@@ -202,6 +202,7 @@ async function renameStatus() {
   }
 }
 
+
 async function normalizeSpecificStatuses() {
   const map = [
     ['в работе', 'В работе'],

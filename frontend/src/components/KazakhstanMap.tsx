@@ -47,7 +47,12 @@ function scoreColor(score: number | undefined): string {
 const W = 800;
 const H = 500;
 
-interface TooltipState { x: number; y: number; tdName: string }
+interface TooltipState {
+  cx: number;      // center-X of region bbox, container px
+  bboxTop: number; // top of region bbox, container px
+  bboxBot: number; // bottom of region bbox, container px
+  tdName: string;
+}
 
 interface GeoFeature {
   type: 'Feature';
@@ -76,25 +81,21 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
 
   const pathGen = geoPath(projection);
 
-  function clientPos(e: React.MouseEvent) {
-    const r = svgRef.current!.getBoundingClientRect();
-    const scaleX = W / r.width;
-    const scaleY = H / r.height;
-    return {
-      x: (e.clientX - r.left) / scaleX,
-      y: (e.clientY - r.top) / scaleY,
-    };
-  }
-
-  function enter(e: React.MouseEvent, tdName: string) {
-    const { x, y } = clientPos(e);
+  function enter(e: React.MouseEvent<SVGPathElement>, tdName: string) {
+    const { width, height } = svgRef.current!.getBoundingClientRect();
+    const scaleX = width / W;
+    const scaleY = height / H;
+    const bbox = (e.currentTarget as SVGPathElement).getBBox();
     setHoveredTd(tdName);
-    setTooltip({ x, y, tdName });
+    setTooltip({
+      cx:      (bbox.x + bbox.width  / 2) * scaleX,
+      bboxTop: bbox.y                     * scaleY,
+      bboxBot: (bbox.y + bbox.height)     * scaleY,
+      tdName,
+    });
   }
 
-  function move(e: React.MouseEvent, tdName: string) {
-    const { x, y } = clientPos(e);
-    setTooltip({ x, y, tdName });
+  function move(_e: React.MouseEvent<SVGPathElement>, tdName: string) {
     setHoveredTd(tdName);
   }
 
@@ -136,14 +137,28 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
 
       {tooltip && (() => {
         const stat = statMap.get(tooltip.tdName);
-        const svgRect = svgRef.current?.getBoundingClientRect();
-        const scaleX = svgRect ? svgRect.width / W : 1;
-        const scaleY = svgRect ? svgRect.height / H : 1;
+        const svgEl = svgRef.current;
+        const cw = svgEl?.getBoundingClientRect().width  ?? W;
+        const ch = svgEl?.getBoundingClientRect().height ?? H;
+        const TW = 230;
+        const TH = 84;
+
+        // Prefer above the region; fall back to below if not enough space
+        let top  = tooltip.bboxTop - TH - 8;
+        if (top < 8) top = tooltip.bboxBot + 8;
+
+        // Center horizontally on the region
+        let left = tooltip.cx - TW / 2;
+
+        // Clamp inside container
+        left = Math.min(Math.max(left, 8), cw - TW - 8);
+        top  = Math.min(Math.max(top,  8), ch - TH - 8);
+
         return (
           <div style={{
             position: 'absolute',
-            left: tooltip.x * scaleX + 14,
-            top: tooltip.y * scaleY - 12,
+            left,
+            top,
             background: 'hsl(var(--background))',
             border: '1px solid hsl(var(--border))',
             borderRadius: 8,
@@ -152,7 +167,7 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
             pointerEvents: 'none',
             boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
             zIndex: 20,
-            maxWidth: 230,
+            width: TW,
           }}>
             <div style={{ fontWeight: 700, color: 'hsl(var(--foreground))', marginBottom: 4, whiteSpace: 'normal', lineHeight: 1.3 }}>
               {tooltip.tdName}
