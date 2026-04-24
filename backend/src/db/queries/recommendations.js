@@ -19,7 +19,7 @@ const statusNormSql = `btrim(lower(coalesce(status, '')))`;
 export async function getDashboardSummary() {
   const activeSql   = `(status ilike 'в работе%' or status = 'Не поддерживается')`;
   const doneSql     = `status ilike 'исполнено%'`;
-  const excludedSql = `status = 'Для снятия с контроля'`;
+  const excludedSql = `(status ilike 'не поддерживается%исключ%' or status = 'Для снятия с контроля')`;
 
   const totalsRes = await pool.query(`
     select
