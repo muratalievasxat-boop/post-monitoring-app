@@ -31,7 +31,7 @@ router.post('/', async (req, res) => {
   if (!email || !password || !name || !role) {
     return res.status(400).json({ error: 'email, password, name, role обязательны' });
   }
-  if (!['admin', 'analyst', 'td'].includes(role)) {
+  if (!['admin', 'analyst', 'td', 'viewer'].includes(role)) {
     return res.status(400).json({ error: 'Недопустимая роль' });
   }
   if (role === 'td' && !td_name) {
@@ -43,7 +43,7 @@ router.post('/', async (req, res) => {
       `INSERT INTO users (email, password_hash, name, role, td_name)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, email, name, role, td_name, created_at`,
-      [email.toLowerCase().trim(), hash, name.trim(), role, td_name ?? null]
+      [email.toLowerCase().trim(), hash, name.trim(), role, td_name || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (e) {
@@ -56,6 +56,12 @@ router.post('/', async (req, res) => {
 // PATCH /api/users/:id
 router.patch('/:id', async (req, res) => {
   const { name, email, password, role, td_name } = req.body;
+  if (role && !['admin', 'analyst', 'td', 'viewer'].includes(role)) {
+    return res.status(400).json({ error: 'Недопустимая роль' });
+  }
+  if (role === 'td' && td_name === '') {
+    return res.status(400).json({ error: 'Для роли ТД укажите территориальный департамент' });
+  }
   try {
     const current = await pool.query('SELECT id FROM users WHERE id = $1', [req.params.id]);
     if (!current.rows[0]) return res.status(404).json({ error: 'Пользователь не найден' });

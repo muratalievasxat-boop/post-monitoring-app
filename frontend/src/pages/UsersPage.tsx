@@ -6,7 +6,7 @@ interface User {
   id: number;
   email: string;
   name: string;
-  role: 'admin' | 'analyst' | 'td';
+  role: 'admin' | 'analyst' | 'td' | 'viewer';
   td_name: string | null;
   created_at: string;
 }
@@ -15,12 +15,14 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Администратор',
   analyst: 'Аналитик',
   td: 'ТД',
+  viewer: 'Наблюдатель',
 };
 
 const ROLE_COLORS: Record<string, string> = {
   admin: '#7c3aed',
   analyst: '#2563eb',
   td: '#d97706',
+  viewer: '#0891b2',
 };
 
 function authFetch(url: string, options: RequestInit = {}) {
@@ -98,11 +100,11 @@ function UserModal({ editing, tdList, onClose, onSaved }: {
 
     setSaving(true); setError(null);
     try {
-      const body: Record<string, string> = {
+      const body: Record<string, string | null> = {
         name: form.name.trim(),
         email: form.email.trim(),
         role: form.role,
-        td_name: form.role === 'td' ? form.td_name : '',
+        td_name: form.role === 'td' ? form.td_name : null,
       };
       if (form.password) body.password = form.password;
 
@@ -147,6 +149,7 @@ function UserModal({ editing, tdList, onClose, onSaved }: {
             <select style={{ ...inputStyle(), appearance: 'auto' } as React.CSSProperties} value={form.role} onChange={set('role')}>
               <option value="td">ТД (территориальный департамент)</option>
               <option value="analyst">Аналитик</option>
+              <option value="viewer">Наблюдатель (только чтение)</option>
               <option value="admin">Администратор</option>
             </select>
           </div>
@@ -242,7 +245,7 @@ export default function UsersPage() {
 
   function refresh() { qc.invalidateQueries({ queryKey: ['/api/users'] }); }
 
-  const roleOrder: Record<string, number> = { admin: 0, analyst: 1, td: 2 };
+  const roleOrder: Record<string, number> = { admin: 0, analyst: 1, td: 2, viewer: 3 };
   const sorted = [...users].sort((a, b) => (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9));
 
   return (
