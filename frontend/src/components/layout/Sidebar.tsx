@@ -9,6 +9,7 @@ interface SidebarProps {
   onChange: (tab: TabId) => void;
   user: AuthUser | null;
   onLogout: () => void;
+  isOpen?: boolean;
 }
 
 const mainItems = [
@@ -18,7 +19,7 @@ const mainItems = [
   { id: 'export'    as TabId, label: 'Администрирование', icon: Settings },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLogout, isOpen = false }) => {
   const isTd      = user?.role === 'td';
   const isViewer  = user?.role === 'viewer';
   const isAdmin   = user?.role === 'admin';
@@ -32,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
   });
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? ' sidebar--open' : ''}`}>
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">М</div>
         <div>

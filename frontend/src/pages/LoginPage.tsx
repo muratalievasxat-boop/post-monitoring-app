@@ -42,9 +42,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'hsl(var(--background))',
+      background: 'hsl(var(--background))', padding: '16px',
     }}>
-      <div className="card" style={{ width: 360, padding: '32px 28px' }}>
+      <div className="card" style={{ width: '100%', maxWidth: 360, padding: '32px 28px' }}>
         <div style={{ marginBottom: 24, textAlign: 'center' }}>
           <div style={{ fontSize: 28, fontWeight: 800, color: 'hsl(var(--foreground))', marginBottom: 4 }}>Вход</div>
           <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>Система мониторинга дебюрократизации</div>

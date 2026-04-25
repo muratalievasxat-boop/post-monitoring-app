@@ -220,7 +220,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
     <div className="content" style={{ gap: 16 }}>
 
       {/* KPI */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+      <div className="dashboard-kpi-grid">
         <KpiCard label="Всего" value={stats.totals.all} icon={ListChecks} tone="blue"
           selected={selectedStatus === null} onClick={() => setSelectedStatus(null)} />
         <KpiCard label="В работе" value={stats.totals.active + (stats.totals.rejected ?? 0)} pct={pct(stats.totals.active + (stats.totals.rejected ?? 0))} icon={Clock} tone="amber"
@@ -263,7 +263,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       </div>
 
       {/* 2 графика */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="dashboard-2col">
 
         {/* Исполнение по циклам — stacked bar */}
         <div className="card chart-card">
@@ -319,7 +319,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       </div>
 
       {/* Лидеры ГО + Просроченные по исполнителям */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="dashboard-2col">
         <div className="card chart-card">
           <div className="card-title-row">
             <div className="card-title">🏆 Лидеры ГО</div>
@@ -352,7 +352,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       </div>
 
       {/* Лидеры по сферам + Требуют внимания */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="dashboard-2col">
         <div className="card chart-card">
           <div className="card-title-row">
             <div className="card-title">🏆 Лидеры по сферам</div>

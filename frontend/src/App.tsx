@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './styles.css'
 import DashboardPage from './pages/DashboardPage'
 import RegistryPage from './pages/RegistryPage'
@@ -37,11 +37,19 @@ export function App() {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'light'
   })
   const [drillDown, setDrillDown] = useState<RegistryDrillDown | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    document.body.classList.toggle('sidebar-lock', sidebarOpen)
+    return () => { document.body.classList.remove('sidebar-lock') }
+  }, [sidebarOpen])
+
+  const closeSidebar = useCallback(() => setSidebarOpen(false), [])
 
   function handleLogin(token: string, user: AuthUser) {
     localStorage.setItem('jwt', token)
@@ -60,6 +68,7 @@ export function App() {
   function handleTabChange(newTab: TabId) {
     if (auth?.user.role === 'td' && !TD_ALLOWED_TABS.includes(newTab)) return;
     setTab(newTab);
+    setSidebarOpen(false);
   }
 
   function handleDrillDown(filter: RegistryDrillDown) {
@@ -83,9 +92,13 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar current={tab} onChange={handleTabChange} user={auth.user} onLogout={handleLogout} />
+      <div
+        className={`sidebar-backdrop${sidebarOpen ? ' sidebar-backdrop--visible' : ''}`}
+        onClick={closeSidebar}
+      />
+      <Sidebar current={tab} onChange={handleTabChange} user={auth.user} onLogout={handleLogout} isOpen={sidebarOpen} />
       <section className="main">
-        <Topbar title={title} theme={theme} onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')} />
+        <Topbar title={title} theme={theme} onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')} onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="page-content">
           {tab === 'dashboard' && auth.user.role !== 'td' && <DashboardPage onDrillDown={handleDrillDown} />}
           {tab === 'registry' && auth.user.role !== 'td' && (
