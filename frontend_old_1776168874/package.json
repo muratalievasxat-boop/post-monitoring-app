@@ -1,9 +1,0 @@
-{
-  "name": "frontend",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "node src/mock-dev-server.js",
-    "start": "node src/mock-dev-server.js"
-  }
-}
