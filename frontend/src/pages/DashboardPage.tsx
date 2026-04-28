@@ -7,8 +7,9 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
-import { CheckCircle2, Clock, Ban, ListChecks } from "lucide-react";
+import { CheckCircle2, Clock, Ban, ListChecks, Trophy, AlertTriangle, AlertCircle } from "lucide-react";
 import type { RegistryDrillDown } from "@/App";
+import Sparkline from "@/components/shared/Sparkline";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -37,10 +38,15 @@ interface DashboardSummary {
   byCompletionForm: { completion_form: string; total: number; done: number; pct: number }[];
 }
 
+// Hex values kept for Chart.js datasets (cannot use CSS custom properties there)
 const C = { done: "#16a34a", active: "#d97706", rejected: "#dc2626", excluded: "#94a3b8", analiz: "#2563eb", monitoring: "#7c3aed" };
 
-function KpiCard({ label, value, pct, sub, icon: Icon, tone, selected, onClick }: {
-  label: string; value: number; pct?: number; sub?: string; icon: any;
+const SPARKLINE_PLACEHOLDER: null[] = Array(10).fill(null);
+
+const DIM_TOOLTIP = "Фильтр KPI применяется только к графикам по циклам — клик по KPI «Всего» снимет фильтр";
+
+function KpiCard({ label, labelShort, value, pct, sub, icon: Icon, tone, selected, onClick }: {
+  label: string; labelShort?: string; value: number; pct?: number; sub?: string; icon: any;
   tone: "blue" | "amber" | "green" | "red" | "slate" | "violet";
   selected?: boolean; onClick?: () => void;
 }) {
@@ -64,15 +70,27 @@ function KpiCard({ label, value, pct, sub, icon: Icon, tone, selected, onClick }
       }}
       title={onClick ? (selected ? "Сбросить фильтр" : `Фильтр: ${label}`) : undefined}
     >
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--kc-accent)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
-        <div style={{ fontSize: 28, fontWeight: 700, color: "hsl(var(--foreground))", lineHeight: 1 }}>{(value ?? 0).toLocaleString("ru")}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--kc-accent)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+          {labelShort ? (
+            <>
+              <span className="kpi-label-full">{label}</span>
+              <span className="kpi-label-short">{labelShort}</span>
+            </>
+          ) : label}
+        </div>
+        <div className="data-num" style={{ fontSize: 28, fontWeight: 700, color: "hsl(var(--foreground))", lineHeight: 1 }}>
+          {(value ?? 0).toLocaleString("ru")}
+        </div>
         {pct !== undefined && (
-          <div style={{ fontSize: 12, color: "var(--kc-accent)", marginTop: 3, fontWeight: 600 }}>{pct}%</div>
+          <div className="data-num" style={{ fontSize: 12, color: "var(--kc-accent)", marginTop: 3, fontWeight: 600 }}>{pct}%</div>
         )}
         {sub && (
           <div style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", marginTop: 2 }}>{sub}</div>
         )}
+        <div style={{ marginTop: 8 }}>
+          <Sparkline values={SPARKLINE_PLACEHOLDER} color="var(--kc-accent)" height={24} />
+        </div>
       </div>
       <Icon size={24} color="var(--kc-accent)" strokeWidth={selected ? 2.5 : 1.5} />
     </div>
@@ -213,8 +231,28 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
     };
   }, [stats]);
 
-  if (isLoading) return <div className="content"><div className="card" style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Загрузка...</div></div>;
+  if (isLoading) return (
+    <div className="content" style={{ gap: 16 }}>
+      <div className="dashboard-kpi-grid">
+        {[0, 1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12 }} />)}
+      </div>
+      <div className="skeleton" style={{ height: 14, borderRadius: 8 }} />
+      <div className="dashboard-2col">
+        <div className="skeleton" style={{ height: 280, borderRadius: 12 }} />
+        <div className="skeleton" style={{ height: 280, borderRadius: 12 }} />
+      </div>
+    </div>
+  );
   if (error || !stats) return <div className="card error">Не удалось загрузить данные.</div>;
+
+  const dimStyle = selectedStatus ? { opacity: 0.5 } : {};
+  const dimTitle = selectedStatus ? DIM_TOOLTIP : undefined;
+
+  const progressItems = [
+    { label: "Исполнено",        val: stats.totals.done,                                  color: "hsl(var(--status-done))" },
+    { label: "В работе",         val: stats.totals.active + (stats.totals.rejected ?? 0), color: "hsl(var(--status-active))" },
+    { label: "Снято с контроля", val: stats.totals.excluded,                              color: "hsl(var(--status-excluded))" },
+  ];
 
   return (
     <div className="content" style={{ gap: 16 }}>
@@ -227,7 +265,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
           selected={selectedStatus === "В работе"} onClick={() => toggleStatus("В работе")} />
         <KpiCard label="Исполнено" value={stats.totals.done} pct={pct(stats.totals.done)} icon={CheckCircle2} tone="green"
           selected={selectedStatus === "Исполнено"} onClick={() => toggleStatus("Исполнено")} />
-        <KpiCard label="Для снятия с контроля" value={stats.totals.excluded} pct={pct(stats.totals.excluded)} icon={Ban} tone="slate"
+        <KpiCard label="Снято с контроля" labelShort="Снято" value={stats.totals.excluded} pct={pct(stats.totals.excluded)} icon={Ban} tone="slate"
           selected={selectedStatus === "Для снятия с контроля"} onClick={() => toggleStatus("Для снятия с контроля")} />
       </div>
 
@@ -243,26 +281,26 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       <div className="card" style={{ padding: "14px 20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <span style={{ fontWeight: 600, fontSize: 14, color: "hsl(var(--foreground))" }}>Общий прогресс исполнения</span>
-          <span style={{ fontSize: 13, color: "hsl(var(--muted-foreground))" }}>{stats.totals.done} из {stats.totals.all} · <strong style={{ color: "#16a34a" }}>{overallPct}%</strong></span>
+          <span className="data-num" style={{ fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
+            {stats.totals.done} из {stats.totals.all} · <strong style={{ color: "hsl(var(--status-done))" }}>{overallPct}%</strong>
+          </span>
         </div>
         <div style={{ height: 14, background: "hsl(var(--border))", borderRadius: 8, overflow: "hidden", display: "flex" }}>
-          {[{ val: stats.totals.done, color: C.done }, { val: stats.totals.active + (stats.totals.rejected ?? 0), color: C.active }, { val: stats.totals.excluded, color: C.excluded }]
-            .map(({ val, color }, i) => (
-              <div key={i} style={{ width: `${(val / (stats.totals.all || 1)) * 100}%`, background: color, height: "100%", transition: "width 0.5s" }} />
-            ))}
+          {progressItems.map(({ val, color }) => (
+            <div key={color} style={{ width: `${(val / (stats.totals.all || 1)) * 100}%`, background: color, height: "100%", transition: "width 0.5s" }} />
+          ))}
         </div>
         <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap" }}>
-          {[{ label: "Исполнено", val: stats.totals.done, color: C.done }, { label: "В работе", val: stats.totals.active + (stats.totals.rejected ?? 0), color: C.active }, { label: "Для снятия с контроля", val: stats.totals.excluded, color: C.excluded }]
-            .map(({ label, val, color }) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 9, height: 9, borderRadius: 2, background: color }} />
-                <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>{label}: <strong style={{ color: "hsl(var(--foreground))" }}>{val}</strong></span>
-              </div>
-            ))}
+          {progressItems.map(({ label, val, color }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ width: 9, height: 9, borderRadius: 2, background: color }} />
+              <span className="data-num" style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>{label}: <strong style={{ color: "hsl(var(--foreground))" }}>{val}</strong></span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* 2 графика */}
+      {/* Графики по циклам — не приглушаются при выборе KPI */}
       <div className="dashboard-2col">
 
         {/* Исполнение по циклам — stacked bar */}
@@ -318,11 +356,15 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
         </div>
       </div>
 
-      {/* Лидеры ГО + Просроченные по исполнителям */}
-      <div className="dashboard-2col">
+      {/* Лидеры ГО + Активные с дедлайном */}
+      <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
         <div className="card chart-card">
           <div className="card-title-row">
-            <div className="card-title">🏆 Лидеры ГО</div>
+            <div className="card-title">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Trophy size={14} />Лидеры ГО
+              </span>
+            </div>
             <div className="card-meta">по % исполнения</div>
           </div>
           <ChartErrorBoundary>
@@ -336,7 +378,11 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
         </div>
         <div className="card chart-card">
           <div className="card-title-row">
-            <div className="card-title">🔴 Просроченные по исполнителям</div>
+            <div className="card-title">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <AlertTriangle size={14} />Активные с дедлайном 2024–2025
+              </span>
+            </div>
             <div className="card-meta">Срок истёк в 2024–2025, статус — «В работе»</div>
           </div>
           <ChartErrorBoundary>
@@ -352,10 +398,14 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       </div>
 
       {/* Лидеры по сферам + Требуют внимания */}
-      <div className="dashboard-2col">
+      <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
         <div className="card chart-card">
           <div className="card-title-row">
-            <div className="card-title">🏆 Лидеры по сферам</div>
+            <div className="card-title">
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Trophy size={14} />Лидеры по сферам
+              </span>
+            </div>
             <div className="card-meta">по % исполнения</div>
           </div>
           <ChartErrorBoundary>
@@ -369,7 +419,11 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
         </div>
         <div className="card">
           <div className="card-title-row">
-            <div className="card-title" style={{ color: "#d97706" }}>⚠️ Требуют внимания</div>
+            <div className="card-title" style={{ color: "hsl(var(--status-active))" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <AlertCircle size={14} />Требуют внимания
+              </span>
+            </div>
             <div className="card-meta">цикл VII · ≤10% · ≥10 рекомендаций</div>
           </div>
           {(stats.byAttention ?? []).length === 0 ? (
@@ -386,7 +440,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
                     onClick={onDrillDown ? () => onDrillDown({ search: row.responsible_org, cycle: "VII" }) : undefined}
                     style={{
                       display: "inline-flex", alignItems: "center", gap: 5,
-                      padding: "5px 10px", borderRadius: 8,
+                      padding: "10px 14px", borderRadius: 8, minHeight: 44,
                       background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))",
                       fontSize: 12, cursor: onDrillDown ? "pointer" : "default",
                     }}
@@ -395,7 +449,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
                     <span style={{ color: "hsl(var(--muted-foreground))" }}>·</span>
                     <span style={{ color: "hsl(var(--muted-foreground))" }}>{row.total} рек.</span>
                     <span style={{ color: "hsl(var(--muted-foreground))" }}>·</span>
-                    <span style={{ color: C.rejected, fontWeight: 700 }}>{row.pct}%</span>
+                    <span className="data-num" style={{ color: C.rejected, fontWeight: 700 }}>{row.pct}%</span>
                     <span style={{ color: "hsl(var(--muted-foreground))" }}>·</span>
                     <span style={{ color: "hsl(var(--muted-foreground))" }}>цикл VII</span>
                   </div>
@@ -404,6 +458,29 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             </>
           )}
         </div>
+      </div>
+
+      {/* Форма закрытия */}
+      <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
+        <div className="card chart-card">
+          <div className="card-title-row">
+            <div className="card-title">Форма закрытия</div>
+            <div className="card-meta">как закрываются исполненные рекомендации</div>
+          </div>
+          {(stats.byCompletionForm ?? []).length === 0 ? (
+            <div style={{ padding: "12px 0", fontSize: 13, color: "hsl(var(--muted-foreground))" }}>Нет данных по форме закрытия</div>
+          ) : (
+            <ChartErrorBoundary>
+            <HBarChart
+              labels={(stats.byCompletionForm ?? []).map(r => r.completion_form)}
+              values={(stats.byCompletionForm ?? []).map(r => r.total)}
+              color={C.monitoring}
+              isCount
+            />
+            </ChartErrorBoundary>
+          )}
+        </div>
+        <div />
       </div>
 
     </div>
