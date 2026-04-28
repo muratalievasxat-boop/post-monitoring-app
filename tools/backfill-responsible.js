@@ -14,7 +14,7 @@ const pool = new pg.Pool({ connectionString: url });
 
 async function main() {
   const { rows } = await pool.query(
-    "SELECT id, responsible FROM recommendations WHERE responsible IS NOT NULL AND btrim(responsible) <> ''"
+    "SELECT id, responsible_org FROM monitoring.recommendations WHERE responsible_org IS NOT NULL AND btrim(responsible_org) <> ''"
   );
   console.log(`Found ${rows.length} records with responsible data`);
 
@@ -23,20 +23,20 @@ async function main() {
   let errors = 0;
 
   for (const row of rows) {
-    const { primary, co } = parseResponsible(row.responsible);
+    const { primary, co } = parseResponsible(row.responsible_org);
     if (!primary) { skipped++; continue; }
 
     try {
       await pool.query('BEGIN');
-      await pool.query('DELETE FROM recommendation_responsible WHERE record_id = $1', [row.id]);
+      await pool.query('DELETE FROM monitoring.recommendation_responsible WHERE record_id = $1', [row.id]);
       await pool.query(
-        `INSERT INTO recommendation_responsible (record_id, org_name, role)
+        `INSERT INTO monitoring.recommendation_responsible (record_id, org_name, role)
          VALUES ($1, $2, 'primary') ON CONFLICT DO NOTHING`,
         [row.id, primary]
       );
       for (const org of co) {
         await pool.query(
-          `INSERT INTO recommendation_responsible (record_id, org_name, role)
+          `INSERT INTO monitoring.recommendation_responsible (record_id, org_name, role)
            VALUES ($1, $2, 'co') ON CONFLICT DO NOTHING`,
           [row.id, org]
         );

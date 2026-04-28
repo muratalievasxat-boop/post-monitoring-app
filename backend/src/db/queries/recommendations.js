@@ -8,23 +8,23 @@ function norm(v) {
 function normalizeStatusGroup(status) {
   const v = norm(status);
   if (!v) return 'unknown';
-  if (v === 'исполнено') return 'done';
+  if (v.startsWith('исполн')) return 'done';
   if (v.startsWith('в работе')) return 'active';
-  if (v.startsWith('не поддерживается')) return 'rejected';
+  if (v === 'не поддерживается') return 'active';
+  if (v.includes('не поддерж') && v.includes('исключ')) return 'excluded';
   if (v.includes('исключ') || v.includes('снятия с контроля')) return 'excluded';
   return 'unknown';
 }
 
-const statusNormSql = `btrim(lower(coalesce(status, '')))`;
+const statusNormSql = `btrim(lower(coalesce(status_normalized, '')))`;
 
 export async function getDashboardSummary({ includeCo = false } = {}) {
-  const activeSql   = `(status ilike 'в работе%' or status = 'Не поддерживается')`;
-  const doneSql     = `status ilike 'исполнено%'`;
-  const excludedSql = `(status ilike 'не поддерживается%исключ%' or status = 'Для снятия с контроля')`;
+  const activeSql   = `(status_normalized ilike 'в работе%' or status_normalized = 'Не поддерживается')`;
+  const doneSql     = `status_normalized ilike 'исполнено%'`;
+  const excludedSql = `(status_normalized ilike 'не поддерживается%исключ%' or status_normalized = 'Для снятия с контроля')`;
 
-  // Qualified variants for queries that JOIN recommendation_responsible
-  const activeR   = `(r.status ilike 'в работе%' or r.status = 'Не поддерживается')`;
-  const doneR     = `r.status ilike 'исполнено%'`;
+  const activeR   = `(r.status_normalized ilike 'в работе%' or r.status_normalized = 'Не поддерживается')`;
+  const doneR     = `r.status_normalized ilike 'исполнено%'`;
   const roleWhere = includeCo ? `rr.role IN ('primary', 'co')` : `rr.role = 'primary'`;
 
   const totalsRes = await pool.query(`
@@ -62,10 +62,10 @@ export async function getDashboardSummary({ includeCo = false } = {}) {
   const byCycleTypeCompletionRes = await pool.query(`
     select
       coalesce(nullif(btrim(cycle), ''), 'Без цикла') as cycle,
-      count(*) filter (where btrim(type) = 'Анализ')::int as analiz_total,
-      count(*) filter (where btrim(type) = 'Анализ' and ${doneSql})::int as analiz_done,
-      count(*) filter (where btrim(type) = 'Мониторинг')::int as monitoring_total,
-      count(*) filter (where btrim(type) = 'Мониторинг' and ${doneSql})::int as monitoring_done
+      count(*) filter (where btrim(record_type_normalized) = 'Анализ')::int as analiz_total,
+      count(*) filter (where btrim(record_type_normalized) = 'Анализ' and ${doneSql})::int as analiz_done,
+      count(*) filter (where btrim(record_type_normalized) = 'Мониторинг')::int as monitoring_total,
+      count(*) filter (where btrim(record_type_normalized) = 'Мониторинг' and ${doneSql})::int as monitoring_done
     from recommendations
     group by 1
     order by 1 asc
@@ -95,7 +95,7 @@ export async function getDashboardSummary({ includeCo = false } = {}) {
     from recommendations r
     left join recommendation_responsible rr on rr.record_id = r.id and ${roleWhere}
     where (${activeR})
-      and (r.deadline like '%2024%' or r.deadline like '%2025%')
+      and (r.due_raw like '%2024%' or r.due_raw like '%2025%')
     group by 1
     order by 2 desc
     limit 15
@@ -103,7 +103,7 @@ export async function getDashboardSummary({ includeCo = false } = {}) {
 
   const bySphereStatusRes = await pool.query(`
     select
-      coalesce(nullif(btrim(sphere), ''), 'Без сферы') as sphere,
+      coalesce(nullif(btrim(sphere_normalized), ''), 'Без сферы') as sphere,
       count(*) filter (where ${doneSql})::int as done,
       count(*)::int as total,
       round(
@@ -139,7 +139,7 @@ export async function getDashboardSummary({ includeCo = false } = {}) {
 
   const byCompletionFormRes = await pool.query(`
     select
-      coalesce(nullif(btrim("completionForm"), ''), 'Не указана') as completion_form,
+      coalesce(nullif(btrim(completion_form), ''), 'Не указана') as completion_form,
       count(*)::int as total,
       count(*) filter (where ${doneSql})::int as done,
       round(
@@ -147,7 +147,7 @@ export async function getDashboardSummary({ includeCo = false } = {}) {
         / nullif(count(*), 0)
       )::int as pct
     from recommendations
-    where coalesce(btrim("completionForm"), '') <> ''
+    where coalesce(btrim(completion_form), '') <> ''
     group by 1
     order by total desc
     limit 12
@@ -175,25 +175,23 @@ export async function getRecommendationFilters() {
   `);
 
   const statuses = await pool.query(`
-    select distinct
-      upper(left(btrim(lower(status)), 1))
-      || lower(substring(btrim(status) from 2)) as status_normalized
+    select distinct status_normalized
     from recommendations
-    where coalesce(btrim(status), '') <> ''
+    where coalesce(btrim(status_normalized), '') <> ''
     order by 1
   `);
 
   const spheres = await pool.query(`
-    select distinct btrim(sphere) as sphere
+    select distinct btrim(sphere_normalized) as sphere
     from recommendations
-    where coalesce(btrim(sphere), '') <> ''
+    where coalesce(btrim(sphere_normalized), '') <> ''
     order by 1
   `);
 
   const types = await pool.query(`
-    select distinct btrim(type) as record_type
+    select distinct btrim(record_type_normalized) as record_type
     from recommendations
-    where coalesce(btrim(type), '') <> ''
+    where coalesce(btrim(record_type_normalized), '') <> ''
     order by 1
   `);
 
@@ -209,7 +207,7 @@ export async function getRecommendationFilters() {
     select count(*)::int as count
     from recommendations
     where ${statusNormSql} like 'в работе%'
-      and deadline like '%2024%'
+      and due_raw like '%2024%'
   `);
 
   return {
@@ -241,9 +239,9 @@ export async function listRecommendations(params) {
     const i = values.length;
     where.push(`
       (
-        coalesce(proposal,'') ilike $${i}
-        or coalesce(responsible,'') ilike $${i}
-        or coalesce(sphere,'') ilike $${i}
+        coalesce(proposal_text,'') ilike $${i}
+        or coalesce(responsible_org,'') ilike $${i}
+        or coalesce(sphere_normalized,'') ilike $${i}
       )
     `);
   }
@@ -255,22 +253,22 @@ export async function listRecommendations(params) {
 
   if (status) {
     values.push(status.trim().toLowerCase());
-    where.push(`lower(btrim(coalesce(status,''))) = $${values.length}`);
+    where.push(`lower(btrim(coalesce(status_normalized,''))) = $${values.length}`);
   }
 
   if (sphere) {
     values.push(sphere.trim());
-    where.push(`btrim(coalesce(sphere,'')) = $${values.length}`);
+    where.push(`btrim(coalesce(sphere_normalized,'')) = $${values.length}`);
   }
 
   if (type) {
     values.push(type.trim());
-    where.push(`btrim(coalesce(type,'')) = $${values.length}`);
+    where.push(`btrim(coalesce(record_type_normalized,'')) = $${values.length}`);
   }
 
   if (overdue) {
     where.push(`${statusNormSql} like 'в работе%'`);
-    where.push(`deadline like '%2024%'`);
+    where.push(`due_raw like '%2024%'`);
   }
 
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
@@ -278,14 +276,14 @@ export async function listRecommendations(params) {
   const sql = `
     select
       id,
-      id as seq_no,
-      btrim(coalesce(type, '')) as record_type_normalized,
+      seq_no,
+      btrim(coalesce(record_type_normalized, '')) as record_type_normalized,
       btrim(coalesce(cycle, '')) as cycle,
-      btrim(coalesce(sphere, '')) as sphere_normalized,
-      coalesce(proposal, '') as proposal_text,
-      btrim(coalesce(responsible, '')) as responsible_org,
-      btrim(coalesce(deadline, '')) as due_raw,
-      btrim(coalesce(status, '')) as status_normalized
+      btrim(coalesce(sphere_normalized, '')) as sphere_normalized,
+      coalesce(proposal_text, '') as proposal_text,
+      btrim(coalesce(responsible_org, '')) as responsible_org,
+      btrim(coalesce(due_raw, '')) as due_raw,
+      btrim(coalesce(status_normalized, '')) as status_normalized
     from recommendations
     ${whereSql}
     order by id asc
@@ -319,30 +317,30 @@ export async function getRecommendationById(id) {
   const res = await pool.query(`
     select
       r.id,
-      r.id as seq_no,
-      btrim(coalesce(r.type, '')) as record_type_raw,
-      btrim(coalesce(r.type, '')) as record_type_normalized,
+      r.seq_no,
+      btrim(coalesce(r.record_type_raw, '')) as record_type_raw,
+      btrim(coalesce(r.record_type_normalized, '')) as record_type_normalized,
       btrim(coalesce(r.cycle, '')) as cycle,
-      btrim(coalesce(r.sphere, '')) as sphere_raw,
-      btrim(coalesce(r.sphere, '')) as sphere_normalized,
-      coalesce(r.proposal, '') as proposal_text,
-      btrim(coalesce(r.responsible, '')) as responsible_raw,
-      coalesce(r.stakeholders, '') as interested_orgs,
-      coalesce(r."completionForm", '') as completion_form,
-      btrim(coalesce(r.deadline, '')) as due_raw,
-      ''::text as status_raw,
-      btrim(coalesce(r.status, '')) as status_normalized,
-      coalesce(r."position2024", '') as position_2024_2025,
-      coalesce(r."position2026", '') as position_2026,
-      coalesce(r."adgsPosition", '') as adgs_position,
+      btrim(coalesce(r.sphere_raw, '')) as sphere_raw,
+      btrim(coalesce(r.sphere_normalized, '')) as sphere_normalized,
+      coalesce(r.proposal_text, '') as proposal_text,
+      btrim(coalesce(r.responsible_org, '')) as responsible_raw,
+      coalesce(r.interested_orgs, '') as interested_orgs,
+      coalesce(r.completion_form, '') as completion_form,
+      btrim(coalesce(r.due_raw, '')) as due_raw,
+      btrim(coalesce(r.status_raw, '')) as status_raw,
+      btrim(coalesce(r.status_normalized, '')) as status_normalized,
+      coalesce(r.position_2024_2025, '') as position_2024_2025,
+      coalesce(r.position_2026, '') as position_2026,
+      coalesce(r.adgs_position, '') as adgs_position,
       null::text as changed_by,
-      coalesce(r."caseNote", '') as case_note,
-      null::timestamptz as status_updated_at,
-      null::int as source_row_no,
-      null::text as source_file_name,
-      null::text as source_sheet_name,
-      null::timestamptz as created_at,
-      null::timestamptz as updated_at,
+      coalesce(r.case_note, '') as case_note,
+      r.status_updated_at,
+      r.source_row_no,
+      r.source_file_name,
+      r.source_sheet_name,
+      r.created_at,
+      r.updated_at,
       (
         select org_name
         from recommendation_responsible
@@ -366,17 +364,13 @@ export async function getRecommendationById(id) {
 
   row.status_group = normalizeStatusGroup(row.status_normalized);
 
-  // Build structured responsible object; fall back to parseResponsible if link table is empty
   const primary = row._responsible_primary ?? null;
   const co = Array.isArray(row._responsible_co) ? row._responsible_co : [];
   const raw = row.responsible_raw ?? '';
 
-  if (primary) {
-    row.responsible = { primary, co, raw };
-  } else {
-    row.responsible = { ...parseResponsible(raw), raw };
-  }
-  // Keep legacy flat field for compatibility
+  row.responsible = primary
+    ? { primary, co, raw }
+    : { ...parseResponsible(raw), raw };
   row.responsible_org = primary ?? raw;
 
   delete row._responsible_primary;
@@ -404,38 +398,40 @@ function normalizeStatusValue(raw) {
 }
 
 export async function updateRecommendationStatus(id, payload) {
-  const rawStatus = payload.status ?? payload.status_normalized ?? null;
-  const status_normalized = normalizeStatusValue(rawStatus);
-  const deadline = payload.deadline?.trim() || payload.due_raw?.trim() || null;
-  const position2026 = payload.position2026 ?? payload.position_go_2026_03_27 ?? null;
-  const adgsPosition = payload.adgsPosition ?? payload.position_adgs ?? null;
-  const caseNote = payload.comment ?? null;
+  const rawStatus   = payload.status ?? payload.status_normalized ?? null;
+  const status_norm = normalizeStatusValue(rawStatus);
+  const dueRaw      = payload.due_raw?.trim() || payload.deadline?.trim() || null;
+  const pos2026     = payload.position_2026 ?? payload.position2026 ?? null;
+  const adgsPos     = payload.adgs_position ?? payload.adgsPosition ?? null;
+  const caseNote    = payload.comment ?? payload.case_note ?? null;
 
   const oldRes = await pool.query(
-    'select status from recommendations where id = $1',
+    'select status_normalized from recommendations where id = $1',
     [id]
   );
   if (!oldRes.rows[0]) return null;
-  const old_status = oldRes.rows[0].status;
+  const old_status = oldRes.rows[0].status_normalized;
 
   const res = await pool.query(`
     update recommendations
     set
-      status = coalesce($2, status),
-      deadline = coalesce($3, deadline),
-      "position2026" = coalesce($4, "position2026"),
-      "adgsPosition" = coalesce($5, "adgsPosition"),
-      "caseNote" = coalesce($6, "caseNote")
+      status_normalized = coalesce($2, status_normalized),
+      due_raw           = coalesce($3, due_raw),
+      position_2026     = coalesce($4, position_2026),
+      adgs_position     = coalesce($5, adgs_position),
+      case_note         = coalesce($6, case_note),
+      status_updated_at = now(),
+      updated_at        = now()
     where id = $1
     returning id
-  `, [id, status_normalized, deadline, position2026, adgsPosition, caseNote]);
+  `, [id, status_norm, dueRaw, pos2026, adgsPos, caseNote]);
 
   if (!res.rows[0]) return null;
 
   try {
     await pool.query(
       'insert into status_history (record_id, old_status, new_status, comment) values ($1, $2, $3, $4)',
-      [id, old_status, status_normalized, caseNote]
+      [id, old_status, status_norm, caseNote]
     );
   } catch (e) {
     console.error('[history] Failed to write status history:', e.message);
