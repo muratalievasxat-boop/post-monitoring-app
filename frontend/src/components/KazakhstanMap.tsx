@@ -81,11 +81,11 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
 
   const pathGen = geoPath(projection);
 
-  function enter(e: React.MouseEvent<SVGPathElement>, tdName: string) {
+  function showTooltip(el: SVGPathElement, tdName: string) {
     const { width, height } = svgRef.current!.getBoundingClientRect();
     const scaleX = width / W;
     const scaleY = height / H;
-    const bbox = (e.currentTarget as SVGPathElement).getBBox();
+    const bbox = el.getBBox();
     setHoveredTd(tdName);
     setTooltip({
       cx:      (bbox.x + bbox.width  / 2) * scaleX,
@@ -93,6 +93,10 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
       bboxBot: (bbox.y + bbox.height)     * scaleY,
       tdName,
     });
+  }
+
+  function enter(e: React.MouseEvent<SVGPathElement>, tdName: string) {
+    showTooltip(e.currentTarget, tdName);
   }
 
   function move(_e: React.MouseEvent<SVGPathElement>, tdName: string) {
@@ -104,13 +108,19 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
     setTooltip(null);
   }
 
+  function handleTouchStart(e: React.TouchEvent<SVGPathElement>, tdName: string) {
+    e.stopPropagation();
+    showTooltip(e.currentTarget, tdName);
+  }
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', display: 'block' }}
+        style={{ width: '100%', height: 'auto', display: 'block', touchAction: 'manipulation' }}
         onMouseLeave={leave}
+        onTouchStart={leave}
       >
         {features.map(f => {
           const tdName = EN_TO_RU[f.properties.name] ?? f.properties.name;
@@ -129,6 +139,7 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
               onMouseEnter={e => enter(e, tdName)}
               onMouseMove={e => move(e, tdName)}
               onMouseLeave={leave}
+              onTouchStart={e => handleTouchStart(e, tdName)}
               onClick={() => onClickRegion(tdName)}
             />
           );
@@ -140,7 +151,7 @@ export default function KazakhstanMap({ stats, onClickRegion }: Props) {
         const svgEl = svgRef.current;
         const cw = svgEl?.getBoundingClientRect().width  ?? W;
         const ch = svgEl?.getBoundingClientRect().height ?? H;
-        const TW = 230;
+        const TW = Math.min(230, cw - 32);
         const TH = 84;
 
         // Prefer above the region; fall back to below if not enough space
