@@ -2109,9 +2109,10 @@ button {
     min-width: 0 !important;
   }
 
-  /* Page content padding */
+  /* Page content padding — bottom accounts for bottom-nav height + safe area */
   .page-content {
     padding: 14px !important;
+    padding-bottom: max(72px, calc(env(safe-area-inset-bottom) + 56px)) !important;
     overflow: visible !important;
   }
 
@@ -2193,6 +2194,7 @@ button {
 @media (max-width: 430px) {
   .page-content {
     padding: 10px !important;
+    padding-bottom: max(72px, calc(env(safe-area-inset-bottom) + 56px)) !important;
   }
   .topbar {
     padding: 0 10px !important;
@@ -2203,4 +2205,56 @@ button {
   .dashboard-kpi-grid {
     gap: 6px;
   }
+}
+
+/* ── Bottom Navigation ──────────────────────── */
+.bottom-nav {
+  display: none; /* hidden on desktop */
+}
+
+@media (max-width: 767px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    z-index: 200;
+    background: hsl(var(--card));
+    border-top: 1px solid hsl(var(--border));
+    align-items: stretch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .bottom-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    min-height: 44px;
+    padding: 0;
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+    font-weight: 500;
+    transition: color 0.12s;
+  }
+
+  .bottom-nav-btn--active {
+    color: hsl(var(--primary));
+  }
+
+  .bottom-nav-btn:active {
+    opacity: 0.7;
+  }
+}
+
+[data-theme="dark"] .bottom-nav {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
 }
