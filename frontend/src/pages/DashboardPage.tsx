@@ -7,9 +7,11 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
-import { CheckCircle2, Clock, Ban, ListChecks, Trophy, AlertTriangle, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, Ban, ListChecks, Trophy, AlertTriangle, AlertCircle, BarChart2 } from "lucide-react";
 import type { RegistryDrillDown } from "@/App";
 import Sparkline from "@/components/shared/Sparkline";
+import EmptyState from "@/components/shared/EmptyState";
+import ErrorState from "@/components/shared/ErrorState";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -166,7 +168,7 @@ const STATUS_COLOR_MAP: Record<string, string> = {
 export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: RegistryDrillDown) => void }) {
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>(null);
 
-  const { data: stats, isLoading, error } = useQuery<DashboardSummary>({
+  const { data: stats, isLoading, error, refetch } = useQuery<DashboardSummary>({
     queryKey: ["/api/dashboard/summary"],
     queryFn: () => apiRequest("GET", "/api/dashboard/summary").then((r) => r.json()),
   });
@@ -243,7 +245,11 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       </div>
     </div>
   );
-  if (error || !stats) return <div className="card error">Не удалось загрузить данные.</div>;
+  if (error || !stats) return (
+    <div className="content">
+      <ErrorState onRetry={() => refetch()} />
+    </div>
+  );
 
   const dimStyle = selectedStatus ? { opacity: 0.5 } : {};
   const dimTitle = selectedStatus ? DIM_TOOLTIP : undefined;
@@ -367,14 +373,18 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             </div>
             <div className="card-meta">по % исполнения</div>
           </div>
-          <ChartErrorBoundary>
-          <HBarChart
-            labels={(stats.byOrgStatus ?? []).map(r => r.responsible_org)}
-            values={(stats.byOrgStatus ?? []).map(r => r.pct)}
-            color={C.done}
-            onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
-          />
-          </ChartErrorBoundary>
+          {(stats.byOrgStatus ?? []).length === 0 ? (
+            <EmptyState icon={Trophy} title="Нет данных по ГО" />
+          ) : (
+            <ChartErrorBoundary>
+            <HBarChart
+              labels={(stats.byOrgStatus ?? []).map(r => r.responsible_org)}
+              values={(stats.byOrgStatus ?? []).map(r => r.pct)}
+              color={C.done}
+              onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
+            />
+            </ChartErrorBoundary>
+          )}
         </div>
         <div className="card chart-card">
           <div className="card-title-row">
@@ -385,15 +395,19 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             </div>
             <div className="card-meta">Срок истёк в 2024–2025, статус — «В работе»</div>
           </div>
-          <ChartErrorBoundary>
-          <HBarChart
-            labels={(stats.byOverdueOrg ?? []).map(r => r.responsible_org)}
-            values={(stats.byOverdueOrg ?? []).map(r => r.overdue_count)}
-            color={C.rejected}
-            isCount
-            onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
-          />
-          </ChartErrorBoundary>
+          {(stats.byOverdueOrg ?? []).length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="Нет просроченных рекомендаций" description="Все рекомендации с дедлайном 2024–2025 закрыты или не в статусе «В работе»" />
+          ) : (
+            <ChartErrorBoundary>
+            <HBarChart
+              labels={(stats.byOverdueOrg ?? []).map(r => r.responsible_org)}
+              values={(stats.byOverdueOrg ?? []).map(r => r.overdue_count)}
+              color={C.rejected}
+              isCount
+              onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
+            />
+            </ChartErrorBoundary>
+          )}
         </div>
       </div>
 
@@ -408,14 +422,18 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             </div>
             <div className="card-meta">по % исполнения</div>
           </div>
-          <ChartErrorBoundary>
-          <HBarChart
-            labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
-            values={(stats.bySphereStatus ?? []).map(r => r.pct)}
-            color={C.analiz}
-            onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
-          />
-          </ChartErrorBoundary>
+          {(stats.bySphereStatus ?? []).length === 0 ? (
+            <EmptyState icon={BarChart2} title="Нет данных по сферам" />
+          ) : (
+            <ChartErrorBoundary>
+            <HBarChart
+              labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
+              values={(stats.bySphereStatus ?? []).map(r => r.pct)}
+              color={C.analiz}
+              onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
+            />
+            </ChartErrorBoundary>
+          )}
         </div>
         <div className="card">
           <div className="card-title-row">
@@ -427,7 +445,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             <div className="card-meta">цикл VII · ≤10% · ≥10 рекомендаций</div>
           </div>
           {(stats.byAttention ?? []).length === 0 ? (
-            <div style={{ padding: "12px 0", fontSize: 13, color: "hsl(var(--muted-foreground))" }}>Нет данных по критериям</div>
+            <EmptyState icon={CheckCircle2} title="Всё под контролем" description="Нет ГО с критически низким исполнением в активном цикле VII" />
           ) : (
             <>
               <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginBottom: 10, lineHeight: 1.5 }}>
@@ -468,7 +486,7 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             <div className="card-meta">как закрываются исполненные рекомендации</div>
           </div>
           {(stats.byCompletionForm ?? []).length === 0 ? (
-            <div style={{ padding: "12px 0", fontSize: 13, color: "hsl(var(--muted-foreground))" }}>Нет данных по форме закрытия</div>
+            <EmptyState icon={BarChart2} title="Нет данных по форме закрытия" description="Появятся после накопления исполненных рекомендаций" />
           ) : (
             <ChartErrorBoundary>
             <HBarChart
