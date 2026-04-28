@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { parseResponsible } from '../normalizers/responsible.js';
 
 export async function upsertRecommendation(rec) {
   const sql = `
@@ -47,5 +48,28 @@ export async function upsertRecommendation(rec) {
     rec.quality_flag
   ];
 
-  return pool.query(sql, params);
+  const result = await pool.query(sql, params);
+  const { id } = result.rows[0];
+
+  const { primary, co } = parseResponsible(rec.responsible_org);
+  if (primary) {
+    await pool.query(
+      'DELETE FROM monitoring.recommendation_responsible WHERE record_id = $1',
+      [id]
+    );
+    await pool.query(
+      `INSERT INTO monitoring.recommendation_responsible (record_id, org_name, role)
+       VALUES ($1, $2, 'primary') ON CONFLICT DO NOTHING`,
+      [id, primary]
+    );
+    for (const org of co) {
+      await pool.query(
+        `INSERT INTO monitoring.recommendation_responsible (record_id, org_name, role)
+         VALUES ($1, $2, 'co') ON CONFLICT DO NOTHING`,
+        [id, org]
+      );
+    }
+  }
+
+  return result;
 }

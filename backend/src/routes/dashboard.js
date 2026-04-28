@@ -5,9 +5,10 @@ import { authMiddleware, requireRole } from '../middleware/auth.js';
 const router = express.Router();
 const nonTd = requireRole('admin', 'analyst', 'viewer');
 
-router.get('/summary', authMiddleware, nonTd, async (_req, res) => {
+router.get('/summary', authMiddleware, nonTd, async (req, res) => {
   try {
-    const data = await getDashboardSummary();
+    const includeCo = req.query.include_co === '1';
+    const data = await getDashboardSummary({ includeCo });
     res.json(data);
   } catch (error) {
     console.error('dashboard summary error:', error);

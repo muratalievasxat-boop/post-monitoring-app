@@ -1,4 +1,5 @@
 import { pool } from '../pool.js';
+import { parseResponsible } from '../../lib/parseResponsible.js';
 
 function norm(v) {
   return String(v || '').trim().toLowerCase();
@@ -16,10 +17,15 @@ function normalizeStatusGroup(status) {
 
 const statusNormSql = `btrim(lower(coalesce(status, '')))`;
 
-export async function getDashboardSummary() {
+export async function getDashboardSummary({ includeCo = false } = {}) {
   const activeSql   = `(status ilike 'в работе%' or status = 'Не поддерживается')`;
   const doneSql     = `status ilike 'исполнено%'`;
   const excludedSql = `(status ilike 'не поддерживается%исключ%' or status = 'Для снятия с контроля')`;
+
+  // Qualified variants for queries that JOIN recommendation_responsible
+  const activeR   = `(r.status ilike 'в работе%' or r.status = 'Не поддерживается')`;
+  const doneR     = `r.status ilike 'исполнено%'`;
+  const roleWhere = includeCo ? `rr.role IN ('primary', 'co')` : `rr.role = 'primary'`;
 
   const totalsRes = await pool.query(`
     select
@@ -67,14 +73,15 @@ export async function getDashboardSummary() {
 
   const byOrgStatusRes = await pool.query(`
     select
-      coalesce(nullif(btrim(responsible), ''), 'Не указан') as responsible_org,
-      count(*) filter (where ${doneSql})::int as done,
+      coalesce(rr.org_name, 'Не указан') as responsible_org,
+      count(*) filter (where ${doneR})::int as done,
       count(*)::int as total,
       round(
-        count(*) filter (where ${doneSql})::numeric * 100
+        count(*) filter (where ${doneR})::numeric * 100
         / nullif(count(*), 0)
       )::int as pct
-    from recommendations
+    from recommendations r
+    left join recommendation_responsible rr on rr.record_id = r.id and ${roleWhere}
     group by 1
     having count(*) >= 5
     order by pct desc, total desc
@@ -82,15 +89,16 @@ export async function getDashboardSummary() {
   `);
 
   const byOverdueOrgRes = await pool.query(`
-    SELECT
-      coalesce(nullif(btrim(responsible), ''), 'Не указан') AS responsible_org,
-      count(*)::int AS overdue_count
-    FROM recommendations
-    WHERE (${activeSql})
-      AND (deadline like '%2024%' OR deadline like '%2025%')
-    GROUP BY 1
-    ORDER BY 2 DESC
-    LIMIT 15
+    select
+      coalesce(rr.org_name, 'Не указан') as responsible_org,
+      count(*)::int as overdue_count
+    from recommendations r
+    left join recommendation_responsible rr on rr.record_id = r.id and ${roleWhere}
+    where (${activeR})
+      and (r.deadline like '%2024%' or r.deadline like '%2025%')
+    group by 1
+    order by 2 desc
+    limit 15
   `);
 
   const bySphereStatusRes = await pool.query(`
@@ -113,15 +121,16 @@ export async function getDashboardSummary() {
     select responsible_org, total, done, pct
     from (
       select
-        coalesce(nullif(btrim(responsible), ''), 'Не указан') as responsible_org,
+        coalesce(rr.org_name, 'Не указан') as responsible_org,
         count(*)::int as total,
-        count(*) filter (where ${doneSql})::int as done,
+        count(*) filter (where ${doneR})::int as done,
         round(
-          count(*) filter (where ${doneSql})::numeric * 100
+          count(*) filter (where ${doneR})::numeric * 100
           / nullif(count(*), 0)
         )::int as pct
-      from recommendations
-      where btrim(cycle) = 'VII'
+      from recommendations r
+      left join recommendation_responsible rr on rr.record_id = r.id and ${roleWhere}
+      where btrim(r.cycle) = 'VII'
       group by 1
     ) t
     where total >= 10 and pct <= 10
@@ -189,9 +198,9 @@ export async function getRecommendationFilters() {
   `);
 
   const execs = await pool.query(`
-    select distinct btrim(responsible) as responsible_org
-    from recommendations
-    where coalesce(btrim(responsible), '') <> ''
+    select distinct org_name as responsible_org
+    from recommendation_responsible
+    where role = 'primary'
     order by 1
     limit 200
   `);
@@ -309,39 +318,71 @@ export async function listRecommendations(params) {
 export async function getRecommendationById(id) {
   const res = await pool.query(`
     select
-      id,
-      id as seq_no,
-      btrim(coalesce(type, '')) as record_type_raw,
-      btrim(coalesce(type, '')) as record_type_normalized,
-      btrim(coalesce(cycle, '')) as cycle,
-      btrim(coalesce(sphere, '')) as sphere_raw,
-      btrim(coalesce(sphere, '')) as sphere_normalized,
-      coalesce(proposal, '') as proposal_text,
-      btrim(coalesce(responsible, '')) as responsible_org,
-      coalesce(stakeholders, '') as interested_orgs,
-      coalesce("completionForm", '') as completion_form,
-      btrim(coalesce(deadline, '')) as due_raw,
+      r.id,
+      r.id as seq_no,
+      btrim(coalesce(r.type, '')) as record_type_raw,
+      btrim(coalesce(r.type, '')) as record_type_normalized,
+      btrim(coalesce(r.cycle, '')) as cycle,
+      btrim(coalesce(r.sphere, '')) as sphere_raw,
+      btrim(coalesce(r.sphere, '')) as sphere_normalized,
+      coalesce(r.proposal, '') as proposal_text,
+      btrim(coalesce(r.responsible, '')) as responsible_raw,
+      coalesce(r.stakeholders, '') as interested_orgs,
+      coalesce(r."completionForm", '') as completion_form,
+      btrim(coalesce(r.deadline, '')) as due_raw,
       ''::text as status_raw,
-      btrim(coalesce(status, '')) as status_normalized,
-      coalesce("position2024", '') as position_2024_2025,
-      coalesce("position2026", '') as position_2026,
-      coalesce("adgsPosition", '') as adgs_position,
+      btrim(coalesce(r.status, '')) as status_normalized,
+      coalesce(r."position2024", '') as position_2024_2025,
+      coalesce(r."position2026", '') as position_2026,
+      coalesce(r."adgsPosition", '') as adgs_position,
       null::text as changed_by,
-      coalesce("caseNote", '') as case_note,
+      coalesce(r."caseNote", '') as case_note,
       null::timestamptz as status_updated_at,
       null::int as source_row_no,
       null::text as source_file_name,
       null::text as source_sheet_name,
       null::timestamptz as created_at,
-      null::timestamptz as updated_at
-    from recommendations
-    where id = $1
+      null::timestamptz as updated_at,
+      (
+        select org_name
+        from recommendation_responsible
+        where record_id = r.id and role = 'primary'
+        limit 1
+      ) as _responsible_primary,
+      coalesce(
+        (
+          select array_agg(org_name order by id)
+          from recommendation_responsible
+          where record_id = r.id and role = 'co'
+        ),
+        '{}'::text[]
+      ) as _responsible_co
+    from recommendations r
+    where r.id = $1
   `, [id]);
 
   const row = res.rows[0];
   if (!row) return null;
 
   row.status_group = normalizeStatusGroup(row.status_normalized);
+
+  // Build structured responsible object; fall back to parseResponsible if link table is empty
+  const primary = row._responsible_primary ?? null;
+  const co = Array.isArray(row._responsible_co) ? row._responsible_co : [];
+  const raw = row.responsible_raw ?? '';
+
+  if (primary) {
+    row.responsible = { primary, co, raw };
+  } else {
+    row.responsible = { ...parseResponsible(raw), raw };
+  }
+  // Keep legacy flat field for compatibility
+  row.responsible_org = primary ?? raw;
+
+  delete row._responsible_primary;
+  delete row._responsible_co;
+  delete row.responsible_raw;
+
   return row;
 }
 
