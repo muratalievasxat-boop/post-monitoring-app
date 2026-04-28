@@ -10,6 +10,7 @@ import UsersPage from './pages/UsersPage'
 import LoginPage, { type AuthUser } from './pages/LoginPage'
 import { Sidebar, type TabId } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
+import { BottomNav } from './components/layout/BottomNav'
 
 export interface RegistryDrillDown {
   cycle?: string
@@ -97,6 +98,15 @@ export function App() {
         onClick={closeSidebar}
       />
       <Sidebar current={tab} onChange={handleTabChange} user={auth.user} onLogout={handleLogout} isOpen={sidebarOpen} />
+      {auth.user.role !== 'td' && (
+        <BottomNav
+          current={tab}
+          onChange={handleTabChange}
+          user={auth.user}
+          onOpenMore={() => setSidebarOpen(true)}
+          isDrawerOpen={sidebarOpen}
+        />
+      )}
       <section className="main">
         <Topbar title={title} theme={theme} onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')} onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="page-content">
