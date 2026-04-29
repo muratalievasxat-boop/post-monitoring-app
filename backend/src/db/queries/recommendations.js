@@ -452,6 +452,47 @@ export async function bulkUpdateStatus(ids, payload) {
   return results;
 }
 
+export async function getActionQueue(limit = 20) {
+  const activeWhere = `(r.status_normalized ilike 'в работе%' or r.status_normalized = 'Не поддерживается')`;
+
+  const [summaryRes, itemsRes] = await Promise.all([
+    pool.query(`
+      select
+        count(*) filter (where due_sort_key < current_date - interval '365 days' and due_parse_failed is not true)::int as overdue_old,
+        count(*) filter (where due_sort_key < current_date and due_sort_key >= current_date - interval '365 days' and due_parse_failed is not true)::int as overdue_recent,
+        count(*)::int as active,
+        count(*) filter (where due_sort_key < current_date and due_parse_failed is not true)::int as total_attention
+      from recommendations r
+      where ${activeWhere}
+    `),
+    pool.query(`
+      select
+        r.id,
+        r.seq_no,
+        r.proposal_text,
+        coalesce(rr.org_name, btrim(coalesce(r.responsible_org, ''))) as responsible_org,
+        btrim(coalesce(r.sphere_normalized, '')) as sphere_normalized,
+        btrim(coalesce(r.due_raw, '')) as due_raw,
+        r.due_sort_key,
+        btrim(coalesce(r.cycle, '')) as cycle,
+        (current_date - r.due_sort_key)::int as days_overdue,
+        case when r.due_sort_key < current_date - interval '365 days' then 'old' else 'recent' end as priority_tier
+      from recommendations r
+      left join recommendation_responsible rr on rr.record_id = r.id and rr.role = 'primary'
+      where ${activeWhere}
+        and r.due_sort_key < current_date
+        and r.due_parse_failed is not true
+      order by r.due_sort_key asc
+      limit $1
+    `, [limit]),
+  ]);
+
+  return {
+    items: itemsRes.rows,
+    summary: summaryRes.rows[0],
+  };
+}
+
 export async function getStatusTrends(weeks = 12) {
   const w = Math.min(Math.max(Number(weeks) || 12, 1), 52);
 

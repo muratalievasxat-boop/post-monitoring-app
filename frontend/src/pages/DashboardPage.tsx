@@ -7,11 +7,12 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
-import { CheckCircle2, Clock, Ban, ListChecks, Trophy, AlertTriangle, AlertCircle, BarChart2 } from "lucide-react";
+import { CheckCircle2, Clock, Ban, ListChecks, Trophy, AlertTriangle, BarChart2 } from "lucide-react";
 import type { RegistryDrillDown } from "@/App";
 import Sparkline from "@/components/shared/Sparkline";
 import EmptyState from "@/components/shared/EmptyState";
 import ErrorState from "@/components/shared/ErrorState";
+import ActionQueueCard from "@/components/dashboard/ActionQueueCard";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -435,47 +436,9 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
             </ChartErrorBoundary>
           )}
         </div>
-        <div className="card">
-          <div className="card-title-row">
-            <div className="card-title" style={{ color: "hsl(var(--status-active))" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <AlertCircle size={14} />Требуют внимания
-              </span>
-            </div>
-            <div className="card-meta">цикл VII · ≤10% · ≥10 рекомендаций</div>
-          </div>
-          {(stats.byAttention ?? []).length === 0 ? (
-            <EmptyState icon={CheckCircle2} title="Всё под контролем" description="Нет ГО с критически низким исполнением в активном цикле VII" />
-          ) : (
-            <>
-              <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginBottom: 10, lineHeight: 1.5 }}>
-                По активному циклу VII — ≤10% исполнения (≥10 рекомендаций). Цикл ещё не завершён, данные предварительные.
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {(stats.byAttention ?? []).map(row => (
-                  <div
-                    key={row.responsible_org}
-                    onClick={onDrillDown ? () => onDrillDown({ search: row.responsible_org, cycle: "VII" }) : undefined}
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 5,
-                      padding: "10px 14px", borderRadius: 8, minHeight: 44,
-                      background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))",
-                      fontSize: 12, cursor: onDrillDown ? "pointer" : "default",
-                    }}
-                  >
-                    <span style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>{row.responsible_org}</span>
-                    <span style={{ color: "hsl(var(--muted-foreground))" }}>·</span>
-                    <span style={{ color: "hsl(var(--muted-foreground))" }}>{row.total} рек.</span>
-                    <span style={{ color: "hsl(var(--muted-foreground))" }}>·</span>
-                    <span className="data-num" style={{ color: C.rejected, fontWeight: 700 }}>{row.pct}%</span>
-                    <span style={{ color: "hsl(var(--muted-foreground))" }}>·</span>
-                    <span style={{ color: "hsl(var(--muted-foreground))" }}>цикл VII</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        <ActionQueueCard
+          onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
+        />
       </div>
 
       {/* Форма закрытия */}

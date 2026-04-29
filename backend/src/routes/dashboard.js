@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardSummary, getStatusTrends } from '../db/queries/recommendations.js';
+import { getDashboardSummary, getStatusTrends, getActionQueue } from '../db/queries/recommendations.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -24,6 +24,17 @@ router.get('/trends', authMiddleware, nonTd, async (req, res) => {
   } catch (error) {
     console.error('trends error:', error);
     res.status(500).json({ error: 'Failed to load trends' });
+  }
+});
+
+router.get('/action-queue', authMiddleware, nonTd, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const data = await getActionQueue(limit);
+    res.json(data);
+  } catch (error) {
+    console.error('action-queue error:', error);
+    res.status(500).json({ error: 'Failed to load action queue' });
   }
 });
 
