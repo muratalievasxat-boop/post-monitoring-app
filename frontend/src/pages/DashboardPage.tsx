@@ -13,6 +13,7 @@ import Sparkline from "@/components/shared/Sparkline";
 import EmptyState from "@/components/shared/EmptyState";
 import ErrorState from "@/components/shared/ErrorState";
 import ActionQueueCard from "@/components/dashboard/ActionQueueCard";
+import TrendCard from "@/components/charts/TrendCard";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -306,6 +307,9 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
           ))}
         </div>
       </div>
+
+      {/* Тренд исполнения */}
+      <TrendCard weeks={12} title="% исполнения, 12 недель" />
 
       {/* Графики по циклам — не приглушаются при выборе KPI */}
       <div className="dashboard-2col">
