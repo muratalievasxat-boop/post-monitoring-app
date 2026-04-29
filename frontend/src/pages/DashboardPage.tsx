@@ -7,7 +7,7 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
-import { CheckCircle2, Clock, Ban, ListChecks, Trophy, AlertTriangle, BarChart2 } from "lucide-react";
+import { CheckCircle2, Clock, Ban, ListChecks, Trophy, BarChart2 } from "lucide-react";
 import type { RegistryDrillDown } from "@/App";
 import Sparkline from "@/components/shared/Sparkline";
 import EmptyState from "@/components/shared/EmptyState";
@@ -15,6 +15,7 @@ import ErrorState from "@/components/shared/ErrorState";
 import ActionQueueCard from "@/components/dashboard/ActionQueueCard";
 import TrendCard from "@/components/charts/TrendCard";
 import SphereCycleCard from "@/components/dashboard/SphereCycleCard";
+import RankedOwnersCard from "@/components/dashboard/RankedOwnersCard";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -368,54 +369,10 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
         </div>
       </div>
 
-      {/* Лидеры ГО + Активные с дедлайном */}
-      <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
-        <div className="card chart-card">
-          <div className="card-title-row">
-            <div className="card-title">
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Trophy size={14} />Лидеры ГО
-              </span>
-            </div>
-            <div className="card-meta">по % исполнения</div>
-          </div>
-          {(stats.byOrgStatus ?? []).length === 0 ? (
-            <EmptyState icon={Trophy} title="Нет данных по ГО" />
-          ) : (
-            <ChartErrorBoundary>
-            <HBarChart
-              labels={(stats.byOrgStatus ?? []).map(r => r.responsible_org)}
-              values={(stats.byOrgStatus ?? []).map(r => r.pct)}
-              color={C.done}
-              onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
-            />
-            </ChartErrorBoundary>
-          )}
-        </div>
-        <div className="card chart-card">
-          <div className="card-title-row">
-            <div className="card-title">
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <AlertTriangle size={14} />Активные с дедлайном 2024–2025
-              </span>
-            </div>
-            <div className="card-meta">Срок истёк в 2024–2025, статус — «В работе»</div>
-          </div>
-          {(stats.byOverdueOrg ?? []).length === 0 ? (
-            <EmptyState icon={CheckCircle2} title="Нет просроченных рекомендаций" description="Все рекомендации с дедлайном 2024–2025 закрыты или не в статусе «В работе»" />
-          ) : (
-            <ChartErrorBoundary>
-            <HBarChart
-              labels={(stats.byOverdueOrg ?? []).map(r => r.responsible_org)}
-              values={(stats.byOverdueOrg ?? []).map(r => r.overdue_count)}
-              color={C.rejected}
-              isCount
-              onClickLabel={onDrillDown ? (label) => onDrillDown({ search: label }) : undefined}
-            />
-            </ChartErrorBoundary>
-          )}
-        </div>
-      </div>
+      {/* Топ ведомств */}
+      <RankedOwnersCard
+        onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
+      />
 
       {/* Лидеры по сферам + Требуют внимания */}
       <div className="dashboard-2col" style={dimStyle} title={dimTitle}>

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardSummary, getStatusTrends, getActionQueue, getSphereCycleMatrix, getSphereTotals } from '../db/queries/recommendations.js';
+import { getDashboardSummary, getStatusTrends, getActionQueue, getSphereCycleMatrix, getSphereTotals, getOwnersRanking } from '../db/queries/recommendations.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -42,6 +42,18 @@ router.get('/sphere-totals', authMiddleware, nonTd, async (req, res) => {
   } catch (error) {
     console.error('sphere-totals error:', error);
     res.status(500).json({ error: 'Failed to load sphere totals' });
+  }
+});
+
+router.get('/owners-ranking', authMiddleware, nonTd, async (req, res) => {
+  try {
+    const metric = req.query.metric || 'volume';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 50);
+    const data = await getOwnersRanking(metric, limit);
+    res.json(data);
+  } catch (error) {
+    console.error('owners-ranking error:', error);
+    res.status(500).json({ error: 'Failed to load owners ranking' });
   }
 });
 

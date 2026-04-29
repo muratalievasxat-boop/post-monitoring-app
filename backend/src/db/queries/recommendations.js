@@ -452,6 +452,43 @@ export async function bulkUpdateStatus(ids, payload) {
   return results;
 }
 
+export async function getOwnersRanking(metric = 'volume', limit = 15) {
+  const validMetrics = ['volume', 'pct_done', 'overdue'];
+  const m = validMetrics.includes(metric) ? metric : 'volume';
+  const l = Math.min(Math.max(Number(limit) || 15, 1), 50);
+
+  const { rows } = await pool.query(`
+    with ranked as (
+      select
+        rr.org_name as org,
+        count(*)::int as total,
+        count(*) filter (where r.status_normalized ilike 'исполнено%')::int as done,
+        count(*) filter (where (r.status_normalized ilike 'в работе%' or r.status_normalized = 'Не поддерживается')
+                             and r.due_sort_key < current_date
+                             and r.due_parse_failed is not true)::int as overdue,
+        coalesce(
+          round(count(*) filter (where r.status_normalized ilike 'исполнено%')::numeric * 100
+                / nullif(count(*), 0))::int,
+          0
+        ) as pct_done
+      from recommendations r
+      join recommendation_responsible rr on rr.record_id = r.id and rr.role = 'primary'
+      group by rr.org_name
+      having count(*) >= 3
+    )
+    select * from ranked
+    order by
+      case $1
+        when 'pct_done' then pct_done
+        when 'overdue'  then overdue
+        else            total
+      end desc
+    limit $2
+  `, [m, l]);
+
+  return rows;
+}
+
 export async function getSphereCycleMatrix() {
   const { rows } = await pool.query(`
     select
