@@ -19,6 +19,15 @@ import RankedOwnersCard from "@/components/dashboard/RankedOwnersCard";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
+/*
+ * Dashboard layout by role
+ * ────────────────────────────────────────────────────────────────
+ *  viewer           KPI · progress bar · trend card · cycle charts
+ *  analyst / admin  + action queue · sphere leaders · ranked owners
+ *                   · completion form · sphere × cycle heatmap
+ * ────────────────────────────────────────────────────────────────
+ */
+
 class ChartErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null };
   static getDerivedStateFromError(e: Error) { return { error: e.message }; }
@@ -44,7 +53,6 @@ interface DashboardSummary {
   byCompletionForm: { completion_form: string; total: number; done: number; pct: number }[];
 }
 
-// Hex values kept for Chart.js datasets (cannot use CSS custom properties there)
 const C = { done: "#16a34a", active: "#d97706", rejected: "#dc2626", excluded: "#94a3b8", analiz: "#2563eb", monitoring: "#7c3aed" };
 
 const SPARKLINE_PLACEHOLDER: null[] = Array(10).fill(null);
@@ -157,7 +165,6 @@ function HBarChart({ labels, values, color, isCount, onClickLabel }: {
   );
 }
 
-
 const CYCLE_STATUS_LABELS = ["Исполнено", "В работе", "Для снятия с контроля"] as const;
 
 type StatusFilter = "В работе" | "Исполнено" | "Для снятия с контроля" | null;
@@ -169,7 +176,16 @@ const STATUS_COLOR_MAP: Record<string, string> = {
   "Исполнено": C.done, "В работе": C.active, "Для снятия с контроля": C.excluded,
 };
 
-export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: RegistryDrillDown) => void }) {
+type DashboardRole = 'admin' | 'analyst' | 'viewer';
+
+export default function DashboardPage({
+  onDrillDown,
+  role = 'viewer',
+}: {
+  onDrillDown?: (f: RegistryDrillDown) => void;
+  role?: DashboardRole;
+}) {
+  const isAnalyst = role === 'admin' || role === 'analyst';
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>(null);
 
   const { data: stats, isLoading, error, refetch } = useQuery<DashboardSummary>({
@@ -313,10 +329,8 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
       {/* Тренд исполнения */}
       <TrendCard weeks={12} title="% исполнения, 12 недель" />
 
-      {/* Графики по циклам — не приглушаются при выборе KPI */}
+      {/* Графики по циклам */}
       <div className="dashboard-2col">
-
-        {/* Исполнение по циклам — stacked bar */}
         <div className="card chart-card">
           <div className="card-title-row">
             <div className="card-title">Исполнение по циклам</div>
@@ -342,7 +356,6 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
           </ChartErrorBoundary>
         </div>
 
-        {/* % исполнения по типам — Line chart */}
         <div className="card chart-card">
           <div className="card-title-row">
             <div className="card-title">% исполнения по циклам</div>
@@ -369,67 +382,70 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
         </div>
       </div>
 
-      {/* Топ ведомств */}
-      <RankedOwnersCard
-        onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
-      />
-
-      {/* Лидеры по сферам + Требуют внимания */}
-      <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
-        <div className="card chart-card">
-          <div className="card-title-row">
-            <div className="card-title">
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Trophy size={14} />Лидеры по сферам
-              </span>
+      {/* Лидеры по сферам + Топ ведомств — analyst / admin */}
+      {isAnalyst && (
+        <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
+          <div className="card chart-card">
+            <div className="card-title-row">
+              <div className="card-title">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Trophy size={14} />Лидеры по сферам
+                </span>
+              </div>
+              <div className="card-meta">по % исполнения</div>
             </div>
-            <div className="card-meta">по % исполнения</div>
+            {(stats.bySphereStatus ?? []).length === 0 ? (
+              <EmptyState icon={BarChart2} title="Нет данных по сферам" />
+            ) : (
+              <ChartErrorBoundary>
+              <HBarChart
+                labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
+                values={(stats.bySphereStatus ?? []).map(r => r.pct)}
+                color={C.analiz}
+                onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
+              />
+              </ChartErrorBoundary>
+            )}
           </div>
-          {(stats.bySphereStatus ?? []).length === 0 ? (
-            <EmptyState icon={BarChart2} title="Нет данных по сферам" />
-          ) : (
-            <ChartErrorBoundary>
-            <HBarChart
-              labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
-              values={(stats.bySphereStatus ?? []).map(r => r.pct)}
-              color={C.analiz}
-              onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
-            />
-            </ChartErrorBoundary>
-          )}
+          <RankedOwnersCard
+            onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
+          />
         </div>
-        <ActionQueueCard
-          onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
+      )}
+
+      {/* Форма закрытия + Очередь действий — analyst / admin */}
+      {isAnalyst && (
+        <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
+          <div className="card chart-card">
+            <div className="card-title-row">
+              <div className="card-title">Форма закрытия</div>
+              <div className="card-meta">как закрываются исполненные рекомендации</div>
+            </div>
+            {(stats.byCompletionForm ?? []).length === 0 ? (
+              <EmptyState icon={BarChart2} title="Нет данных по форме закрытия" description="Появятся после накопления исполненных рекомендаций" />
+            ) : (
+              <ChartErrorBoundary>
+              <HBarChart
+                labels={(stats.byCompletionForm ?? []).map(r => r.completion_form)}
+                values={(stats.byCompletionForm ?? []).map(r => r.total)}
+                color={C.monitoring}
+                isCount
+              />
+              </ChartErrorBoundary>
+            )}
+          </div>
+          <ActionQueueCard
+            onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
+          />
+        </div>
+      )}
+
+      {/* Сферы × циклы — analyst / admin */}
+      {isAnalyst && (
+        <SphereCycleCard
+          onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
         />
-      </div>
-
-      {/* Форма закрытия */}
-      <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
-        <div className="card chart-card">
-          <div className="card-title-row">
-            <div className="card-title">Форма закрытия</div>
-            <div className="card-meta">как закрываются исполненные рекомендации</div>
-          </div>
-          {(stats.byCompletionForm ?? []).length === 0 ? (
-            <EmptyState icon={BarChart2} title="Нет данных по форме закрытия" description="Появятся после накопления исполненных рекомендаций" />
-          ) : (
-            <ChartErrorBoundary>
-            <HBarChart
-              labels={(stats.byCompletionForm ?? []).map(r => r.completion_form)}
-              values={(stats.byCompletionForm ?? []).map(r => r.total)}
-              color={C.monitoring}
-              isCount
-            />
-            </ChartErrorBoundary>
-          )}
-        </div>
-        <div />
-      </div>
-
-      {/* Сферы × циклы (heatmap / treemap) */}
-      <SphereCycleCard
-        onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
-      />
+      )}
 
     </div>
   );
