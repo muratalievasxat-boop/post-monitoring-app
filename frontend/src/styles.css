@@ -2291,3 +2291,15 @@ button {
   background: hsl(var(--card));
   border-color: hsl(var(--border));
 }
+
+/* TrendCard chart container — responsive height */
+.trend-chart-container {
+  height: 180px;
+  position: relative;
+}
+
+@media (max-width: 767px) {
+  .trend-chart-container {
+    height: 120px;
+  }
+}
