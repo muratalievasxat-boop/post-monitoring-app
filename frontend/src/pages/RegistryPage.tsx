@@ -14,6 +14,7 @@ interface Rec {
   sphere_normalized?: string;
   proposal_text?: string;
   responsible_org?: string;
+  responsible?: { primary: string | null; co: string[]; raw: string };
   interested_orgs?: string;
   completion_form?: string;
   due_raw?: string;
@@ -38,6 +39,7 @@ interface Filters {
   statuses?: string[];
   spheres?: string[];
   types?: string[];
+  execs?: string[];
   overdueCount?: number;
 }
 
@@ -145,6 +147,8 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
   const [status, setStatus] = useState(ALL);
   const [sphere, setSphere] = useState(ALL);
   const [type, setType] = useState(ALL);
+  const [exec, setExec] = useState(ALL);
+  const [includeCo, setIncludeCo] = useState(false);
   const [page, setPage] = useState(1);
   const [overdueFilter, setOverdueFilter] = useState(false);
 
@@ -196,9 +200,10 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
     if (status !== ALL) p.set("status", status);
     if (sphere !== ALL) p.set("sphere", sphere);
     if (type !== ALL) p.set("type", type);
+    if (exec !== ALL) { p.set("exec", exec); if (includeCo) p.set("include_co", "1"); }
     if (overdueFilter) p.set("overdue", "1");
     return p.toString();
-  }, [page, search, cycle, status, sphere, type, overdueFilter]);
+  }, [page, search, cycle, status, sphere, type, exec, includeCo, overdueFilter]);
 
   // Queries
   const { data, isLoading, error } = useQuery<PageResult>({
@@ -279,6 +284,7 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
 
   function reset() {
     setSearch(""); setCycle(ALL); setStatus(ALL); setSphere(ALL); setType(ALL);
+    setExec(ALL); setIncludeCo(false);
     setOverdueFilter(false); setPage(1); setSelectedIds(new Set()); setOpenDropdown(null);
   }
 
@@ -383,6 +389,10 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
           <option value={ALL}>Тип: все</option>
           {rawTypes.map(item => <option key={item} value={item}>{item}</option>)}
         </select>
+        <select className="filter-select" value={exec} onChange={e => { setExec(e.target.value); setIncludeCo(false); setPage(1); }}>
+          <option value={ALL}>Все ведомства</option>
+          {(filters?.execs ?? []).map(item => <option key={item} value={item}>{item}</option>)}
+        </select>
         <button className="btn-secondary" onClick={reset}>Сбросить</button>
       </div>
 
@@ -402,6 +412,23 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
         >
           ⏰ В работе давно ({overdueCount})
         </button>
+        {exec !== ALL && (
+          <button
+            onClick={() => { setIncludeCo(c => !c); setPage(1); }}
+            style={{
+              height: 28, padding: "0 12px",
+              borderRadius: 14, fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+              border: `1.5px solid ${includeCo ? "#2563eb" : "hsl(var(--border))"}`,
+              background: includeCo ? "#eff6ff" : "transparent",
+              color: includeCo ? "#1d4ed8" : "hsl(var(--muted-foreground))",
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
+              transition: "all 0.15s",
+            }}
+            title="Показывать записи, где ведомство является соисполнителем"
+          >
+            {includeCo ? "✓" : "+"} Вкл. соисполнителей
+          </button>
+        )}
         <div className="registry-meta" style={{ margin: 0 }}>
           Найдено: {total.toLocaleString("ru-RU")} записей
         </div>
@@ -650,7 +677,29 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
               </div>
               <div className="record-row">
                 <div className="record-label">Ответственный исполнитель</div>
-                <div className="record-value">{di.responsible_org || "—"}</div>
+                <div className="record-value">
+                  {di.responsible?.primary ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "hsl(var(--foreground))" }}>
+                        {di.responsible.primary}
+                      </span>
+                      {di.responsible.co.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            Соисполнители:
+                          </span>
+                          {di.responsible.co.map((org, i) => (
+                            <span key={i} style={{ fontSize: 12, color: "hsl(var(--foreground))", background: "hsl(var(--muted))", borderRadius: 5, padding: "1px 7px" }}>
+                              {org}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    di.responsible_org || "—"
+                  )}
+                </div>
               </div>
               <div className="record-row">
                 <div className="record-label">Заинтересованные государственные органы</div>

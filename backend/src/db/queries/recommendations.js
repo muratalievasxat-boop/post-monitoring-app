@@ -228,6 +228,8 @@ export async function listRecommendations(params) {
   const status = params.status || '';
   const sphere = params.sphere || '';
   const type = params.type || '';
+  const exec = params.exec || '';
+  const includeCo = params.include_co === '1';
   const overdue = params.overdue === '1';
   const page = Math.max(Number(params.page || 1), 1);
   const limit = Math.min(Number(params.limit || params.pageSize || 100), 500);
@@ -266,6 +268,17 @@ export async function listRecommendations(params) {
   if (type) {
     values.push(type.trim());
     where.push(`btrim(coalesce(record_type_normalized,'')) = $${values.length}`);
+  }
+
+  if (exec) {
+    const roleClause = includeCo ? `rr.role IN ('primary', 'co')` : `rr.role = 'primary'`;
+    values.push(exec.trim());
+    where.push(`
+      exists (
+        select 1 from recommendation_responsible rr
+        where rr.record_id = id and ${roleClause} and rr.org_name = $${values.length}
+      )
+    `);
   }
 
   if (overdue) {
