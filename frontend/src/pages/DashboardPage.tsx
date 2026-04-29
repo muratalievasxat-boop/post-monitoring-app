@@ -14,6 +14,7 @@ import EmptyState from "@/components/shared/EmptyState";
 import ErrorState from "@/components/shared/ErrorState";
 import ActionQueueCard from "@/components/dashboard/ActionQueueCard";
 import TrendCard from "@/components/charts/TrendCard";
+import SphereCycleCard from "@/components/dashboard/SphereCycleCard";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -467,6 +468,11 @@ export default function DashboardPage({ onDrillDown }: { onDrillDown?: (f: Regis
         </div>
         <div />
       </div>
+
+      {/* Сферы × циклы (heatmap / treemap) */}
+      <SphereCycleCard
+        onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
+      />
 
     </div>
   );

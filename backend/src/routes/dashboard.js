@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardSummary, getStatusTrends, getActionQueue } from '../db/queries/recommendations.js';
+import { getDashboardSummary, getStatusTrends, getActionQueue, getSphereCycleMatrix, getSphereTotals } from '../db/queries/recommendations.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -24,6 +24,24 @@ router.get('/trends', authMiddleware, nonTd, async (req, res) => {
   } catch (error) {
     console.error('trends error:', error);
     res.status(500).json({ error: 'Failed to load trends' });
+  }
+});
+
+router.get('/sphere-cycle-matrix', authMiddleware, nonTd, async (req, res) => {
+  try {
+    res.json(await getSphereCycleMatrix());
+  } catch (error) {
+    console.error('sphere-cycle-matrix error:', error);
+    res.status(500).json({ error: 'Failed to load sphere-cycle matrix' });
+  }
+});
+
+router.get('/sphere-totals', authMiddleware, nonTd, async (req, res) => {
+  try {
+    res.json(await getSphereTotals());
+  } catch (error) {
+    console.error('sphere-totals error:', error);
+    res.status(500).json({ error: 'Failed to load sphere totals' });
   }
 });
 

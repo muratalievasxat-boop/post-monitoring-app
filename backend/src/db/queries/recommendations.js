@@ -452,6 +452,39 @@ export async function bulkUpdateStatus(ids, payload) {
   return results;
 }
 
+export async function getSphereCycleMatrix() {
+  const { rows } = await pool.query(`
+    select
+      coalesce(nullif(btrim(sphere_normalized), ''), 'Без сферы') as sphere,
+      coalesce(nullif(btrim(cycle), ''), 'Без цикла') as cycle,
+      count(*)::int as total,
+      count(*) filter (where status_normalized ilike 'исполнено%')::int as done,
+      case when count(*) > 0
+        then round(count(*) filter (where status_normalized ilike 'исполнено%')::numeric * 100 / count(*))::int
+        else null end as pct
+    from recommendations
+    group by 1, 2
+    having count(*) >= 3
+    order by 1, 2
+  `);
+  return rows;
+}
+
+export async function getSphereTotals() {
+  const { rows } = await pool.query(`
+    select
+      coalesce(nullif(btrim(sphere_normalized), ''), 'Без сферы') as sphere,
+      count(*)::int as total,
+      count(*) filter (where status_normalized ilike 'исполнено%')::int as done,
+      round(count(*) filter (where status_normalized ilike 'исполнено%')::numeric * 100 / nullif(count(*), 0))::int as pct
+    from recommendations
+    group by 1
+    having count(*) >= 3
+    order by total desc
+  `);
+  return rows;
+}
+
 export async function getActionQueue(limit = 20) {
   const activeWhere = `(r.status_normalized ilike 'в работе%' or r.status_normalized = 'Не поддерживается')`;
 
