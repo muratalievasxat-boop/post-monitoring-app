@@ -448,3 +448,66 @@ export async function bulkUpdateStatus(ids, payload) {
   }
   return results;
 }
+
+export async function getStatusTrends(weeks = 12) {
+  const w = Math.min(Math.max(Number(weeks) || 12, 1), 52);
+
+  const { rows: [{ cnt }] } = await pool.query(
+    'select count(*)::int as cnt from status_history'
+  );
+
+  const donePat     = `lower(status_at_week) like 'исполнено%'`;
+  const activePat   = `(lower(status_at_week) like 'в работе%' or status_at_week = 'Не поддерживается')`;
+  const excludedPat = `(lower(status_at_week) like 'не поддерживается%исключ%' or lower(status_at_week) = 'для снятия с контроля')`;
+
+  // Avoid heavy CROSS JOIN when history is essentially empty
+  if (cnt < 10) {
+    const { rows: [point] } = await pool.query(`
+      select
+        to_char(date_trunc('week', now()), 'YYYY-MM-DD') as week_start,
+        count(*)::int as total,
+        count(*) filter (where status_normalized ilike 'исполнено%')::int as done,
+        count(*) filter (where status_normalized ilike 'в работе%'
+                              or status_normalized = 'Не поддерживается')::int as active,
+        count(*) filter (where status_normalized ilike 'не поддерживается%исключ%')::int as excluded,
+        round(count(*) filter (where status_normalized ilike 'исполнено%')::numeric * 100
+          / nullif(count(*), 0))::int as pct_done
+      from recommendations
+    `);
+    return [point];
+  }
+
+  const { rows } = await pool.query(`
+    with weeks as (
+      select generate_series(
+        date_trunc('week', now() - ($1::int - 1) * interval '1 week'),
+        date_trunc('week', now()),
+        interval '1 week'
+      )::date as week_start
+    ),
+    latest_status as (
+      select w.week_start, r.id,
+        coalesce(
+          (select sh.new_status from status_history sh
+           where sh.record_id = r.id
+             and sh.changed_at <= w.week_start + interval '1 week'
+           order by sh.changed_at desc limit 1),
+          r.status_normalized
+        ) as status_at_week
+      from weeks w cross join recommendations r
+    )
+    select
+      to_char(week_start, 'YYYY-MM-DD') as week_start,
+      count(*)::int as total,
+      count(*) filter (where ${donePat})::int as done,
+      count(*) filter (where ${activePat})::int as active,
+      count(*) filter (where ${excludedPat})::int as excluded,
+      round(count(*) filter (where ${donePat})::numeric * 100
+        / nullif(count(*), 0))::int as pct_done
+    from latest_status
+    group by week_start
+    order by week_start asc
+  `, [w]);
+
+  return rows;
+}

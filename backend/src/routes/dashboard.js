@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardSummary } from '../db/queries/recommendations.js';
+import { getDashboardSummary, getStatusTrends } from '../db/queries/recommendations.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,6 +13,17 @@ router.get('/summary', authMiddleware, nonTd, async (req, res) => {
   } catch (error) {
     console.error('dashboard summary error:', error);
     res.status(500).json({ error: 'Failed to load dashboard summary' });
+  }
+});
+
+router.get('/trends', authMiddleware, nonTd, async (req, res) => {
+  try {
+    const weeks = Math.min(Math.max(Number(req.query.weeks) || 12, 1), 52);
+    const data = await getStatusTrends(weeks);
+    res.json(data);
+  } catch (error) {
+    console.error('trends error:', error);
+    res.status(500).json({ error: 'Failed to load trends' });
   }
 });
 
