@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { parseResponsible } from '../normalizers/responsible.js';
+import { parseDeadline } from '../normalizers/deadline.js';
 
 export async function upsertRecommendation(rec) {
   const sql = `
@@ -51,6 +52,7 @@ export async function upsertRecommendation(rec) {
   const result = await pool.query(sql, params);
   const { id } = result.rows[0];
 
+  // Sync responsible link table
   const { primary, co } = parseResponsible(rec.responsible_org);
   if (primary) {
     await pool.query(
@@ -70,6 +72,15 @@ export async function upsertRecommendation(rec) {
       );
     }
   }
+
+  // Sync due_sort_key
+  const dueDate = parseDeadline(rec.due_raw);
+  await pool.query(
+    `UPDATE monitoring.recommendations
+     SET due_sort_key = $1, due_parse_failed = $2
+     WHERE id = $3`,
+    [dueDate, dueDate === null && Boolean(rec.due_raw?.trim()), id]
+  );
 
   return result;
 }

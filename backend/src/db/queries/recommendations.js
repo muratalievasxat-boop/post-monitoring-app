@@ -95,7 +95,8 @@ export async function getDashboardSummary({ includeCo = false } = {}) {
     from recommendations r
     left join recommendation_responsible rr on rr.record_id = r.id and ${roleWhere}
     where (${activeR})
-      and (r.due_raw like '%2024%' or r.due_raw like '%2025%')
+      and r.due_sort_key < current_date
+      and r.due_parse_failed is not true
     group by 1
     order by 2 desc
     limit 15
@@ -207,7 +208,8 @@ export async function getRecommendationFilters() {
     select count(*)::int as count
     from recommendations
     where ${statusNormSql} like 'в работе%'
-      and due_raw like '%2024%'
+      and due_sort_key < current_date
+      and due_parse_failed is not true
   `);
 
   return {
@@ -268,7 +270,8 @@ export async function listRecommendations(params) {
 
   if (overdue) {
     where.push(`${statusNormSql} like 'в работе%'`);
-    where.push(`due_raw like '%2024%'`);
+    where.push(`due_sort_key < current_date`);
+    where.push(`due_parse_failed is not true`);
   }
 
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
