@@ -36,8 +36,8 @@ function textColor(rgb: string): string {
   return lum > 0.35 ? "#1e293b" : "#fff";
 }
 
-const CELL_W = 48;
-const CELL_H = 32;
+const CELL_W = 40;
+const CELL_H = 24;
 const LABEL_W = 152;
 const HEADER_H = 30;
 

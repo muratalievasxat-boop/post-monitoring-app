@@ -71,8 +71,10 @@ function rowValue(metric: Metric, row: OwnerRow): string {
 
 export default function RankedOwnersCard({
   onItemClick,
+  partialFilter = false,
 }: {
   onItemClick?: (org: string) => void;
+  partialFilter?: boolean;
 }) {
   const [metric, setMetric] = useState<Metric>(readMetric);
   const [expanded, setExpanded] = useState(false);
@@ -148,10 +150,17 @@ export default function RankedOwnersCard({
           </div>
         </div>
 
-        <div className="card-meta" style={{ marginBottom: 12 }}>
-          {metric === "volume" && "по количеству рекомендаций"}
-          {metric === "pct_done" && "по доле исполненных"}
-          {metric === "overdue" && "по числу просроченных активных"}
+        <div className="card-meta" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          <span>
+            {metric === "volume" && "по количеству рекомендаций"}
+            {metric === "pct_done" && "по доле исполненных"}
+            {metric === "overdue" && "по числу просроченных активных"}
+          </span>
+          {partialFilter && (
+            <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 6px", background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", borderRadius: 4, border: "1px solid hsl(var(--border))", whiteSpace: "nowrap" }}>
+              фильтр не применён
+            </span>
+          )}
         </div>
 
         {/* Rows */}

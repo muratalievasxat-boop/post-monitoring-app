@@ -123,8 +123,8 @@ export default function SphereTreemap({
     .size([width, TREEMAP_H])
     .padding(2)(root);
 
-  const leaves = root.leaves() as (typeof root.leaves()[0] & { x0: number; y0: number; x1: number; y1: number })[];
-
+  type LeafNode = { x0: number; y0: number; x1: number; y1: number; data: { sphere: string; total: number; pct: number }; value: number };
+  const leaves = root.leaves() as unknown as LeafNode[];
   return (
     <div ref={containerRef} style={{ position: "relative", height: TREEMAP_H }}>
       <svg width={width} height={TREEMAP_H} style={{ display: "block" }}>

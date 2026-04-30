@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, Component, type ReactNode } from "react";
+import { useMemo, useCallback, Component, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -16,6 +16,7 @@ import ActionQueueCard from "@/components/dashboard/ActionQueueCard";
 import TrendCard from "@/components/charts/TrendCard";
 import SphereCycleCard from "@/components/dashboard/SphereCycleCard";
 import RankedOwnersCard from "@/components/dashboard/RankedOwnersCard";
+import { DashboardFilterProvider, useDashboardFilters, type StatusFilter } from "@/lib/dashboardFilters";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -57,7 +58,16 @@ const C = { done: "#16a34a", active: "#d97706", rejected: "#dc2626", excluded: "
 
 const SPARKLINE_PLACEHOLDER: null[] = Array(10).fill(null);
 
-const DIM_TOOLTIP = "Фильтр KPI применяется только к графикам по циклам — клик по KPI «Всего» снимет фильтр";
+const STATUS_KEY_MAP: Record<string, keyof DashboardSummary["byCycleStatus"][0]> = {
+  "Исполнено": "done", "В работе": "active", "Для снятия с контроля": "excluded",
+};
+const STATUS_COLOR_MAP: Record<string, string> = {
+  "Исполнено": C.done, "В работе": C.active, "Для снятия с контроля": C.excluded,
+};
+
+const CYCLE_STATUS_LABELS = ["Исполнено", "В работе", "Для снятия с контроля"] as const;
+
+type DashboardRole = 'admin' | 'analyst' | 'viewer';
 
 function KpiCard({ label, labelShort, value, pct, sub, icon: Icon, tone, selected, onClick }: {
   label: string; labelShort?: string; value: number; pct?: number; sub?: string; icon: any;
@@ -165,20 +175,56 @@ function HBarChart({ labels, values, color, isCount, onClickLabel }: {
   );
 }
 
-const CYCLE_STATUS_LABELS = ["Исполнено", "В работе", "Для снятия с контроля"] as const;
+function PartialFilterBadge() {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 500, padding: "2px 6px",
+      background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))",
+      borderRadius: 4, border: "1px solid hsl(var(--border))",
+      whiteSpace: "nowrap",
+    }}>
+      фильтр не применён
+    </span>
+  );
+}
 
-type StatusFilter = "В работе" | "Исполнено" | "Для снятия с контроля" | null;
+function FilterChipBar() {
+  const { status, cycle, sphere, setStatus, setCycle, setSphere, reset } = useDashboardFilters();
 
-const STATUS_KEY_MAP: Record<string, keyof DashboardSummary["byCycleStatus"][0]> = {
-  "Исполнено": "done", "В работе": "active", "Для снятия с контроля": "excluded",
-};
-const STATUS_COLOR_MAP: Record<string, string> = {
-  "Исполнено": C.done, "В работе": C.active, "Для снятия с контроля": C.excluded,
-};
+  type Chip = { key: string; label: string; color: string; onRemove: () => void };
+  const chips: Chip[] = [
+    status ? { key: "status", label: status, color: STATUS_COLOR_MAP[status], onRemove: () => setStatus(null) } : null,
+    cycle  ? { key: "cycle",  label: `Цикл ${cycle}`, color: "#2563eb", onRemove: () => setCycle(null) } : null,
+    sphere ? { key: "sphere", label: sphere, color: "#7c3aed", onRemove: () => setSphere(null) } : null,
+  ].filter((c): c is Chip => c !== null);
 
-type DashboardRole = 'admin' | 'analyst' | 'viewer';
+  if (chips.length === 0) return null;
 
-export default function DashboardPage({
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderRadius: 8, background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))" }}>
+      <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", fontWeight: 500 }}>Фильтр:</span>
+      {chips.map(({ key, label, color, onRemove }) => (
+        <div key={key} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, background: `${color}18`, border: `1px solid ${color}44` }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "hsl(var(--foreground))" }}>{label}</span>
+          <button
+            onClick={onRemove}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "0 2px", fontSize: 12, color: "hsl(var(--muted-foreground))", lineHeight: 1 }}
+          >✕</button>
+        </div>
+      ))}
+      {chips.length > 1 && (
+        <button
+          onClick={reset}
+          style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "hsl(var(--muted-foreground))", padding: "0 4px" }}
+        >
+          Сбросить всё
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DashboardInner({
   onDrillDown,
   role = 'viewer',
 }: {
@@ -186,7 +232,7 @@ export default function DashboardPage({
   role?: DashboardRole;
 }) {
   const isAnalyst = role === 'admin' || role === 'analyst';
-  const [selectedStatus, setSelectedStatus] = useState<StatusFilter>(null);
+  const { status, setStatus } = useDashboardFilters();
 
   const { data: stats, isLoading, error, refetch } = useQuery<DashboardSummary>({
     queryKey: ["/api/dashboard/summary"],
@@ -196,14 +242,14 @@ export default function DashboardPage({
   const overallPct = useMemo(() => !stats ? 0 : Math.round((stats.totals.done / (stats.totals.all || 1)) * 100), [stats]);
 
   function pct(n: number) { return stats ? Math.round(n / (stats.totals.all || 1) * 100) : 0; }
-  function toggleStatus(s: StatusFilter) { setSelectedStatus(prev => prev === s ? null : s); }
+  function toggleStatus(s: StatusFilter) { setStatus(status === s ? null : s); }
 
   const handleCycleChartClick = useCallback((_: any, elements: any[]) => {
     if (!elements.length || !onDrillDown || !stats) return;
     const { datasetIndex, index } = elements[0];
     const cycle = stats.byCycleStatus[index]?.cycle;
-    const status = CYCLE_STATUS_LABELS[datasetIndex as 0 | 1 | 2];
-    if (cycle) onDrillDown({ cycle, status });
+    const clickedStatus = CYCLE_STATUS_LABELS[datasetIndex as 0 | 1 | 2];
+    if (cycle) onDrillDown({ cycle, status: clickedStatus });
   }, [stats, onDrillDown]);
 
   const handleLineChartClick = useCallback((_: any, elements: any[]) => {
@@ -215,11 +261,11 @@ export default function DashboardPage({
   const cycleStackedData = useMemo(() => {
     const items = stats?.byCycleStatus ?? [];
     const labels = items.map((x) => `Цикл ${x.cycle}`);
-    if (selectedStatus && STATUS_KEY_MAP[selectedStatus]) {
-      const key = STATUS_KEY_MAP[selectedStatus];
+    if (status && STATUS_KEY_MAP[status]) {
+      const key = STATUS_KEY_MAP[status];
       return {
         labels,
-        datasets: [{ label: selectedStatus, data: items.map(x => x[key] as number), backgroundColor: STATUS_COLOR_MAP[selectedStatus], borderRadius: 4, stack: undefined }],
+        datasets: [{ label: status, data: items.map(x => x[key] as number), backgroundColor: STATUS_COLOR_MAP[status], borderRadius: 4, stack: undefined }],
       };
     }
     return {
@@ -230,7 +276,7 @@ export default function DashboardPage({
         { label: "Для снятия с контроля", data: items.map(x => x.excluded), backgroundColor: C.excluded, stack: "s" },
       ],
     };
-  }, [stats, selectedStatus]);
+  }, [stats, status]);
 
   const cycleLineData = useMemo(() => {
     const items = stats?.byCycleTypeCompletion ?? [];
@@ -271,9 +317,6 @@ export default function DashboardPage({
     </div>
   );
 
-  const dimStyle = selectedStatus ? { opacity: 0.5 } : {};
-  const dimTitle = selectedStatus ? DIM_TOOLTIP : undefined;
-
   const progressItems = [
     { label: "Исполнено",        val: stats.totals.done,                                  color: "hsl(var(--status-done))" },
     { label: "В работе",         val: stats.totals.active + (stats.totals.rejected ?? 0), color: "hsl(var(--status-active))" },
@@ -286,22 +329,16 @@ export default function DashboardPage({
       {/* KPI */}
       <div className="dashboard-kpi-grid">
         <KpiCard label="Всего" value={stats.totals.all} icon={ListChecks} tone="blue"
-          selected={selectedStatus === null} onClick={() => setSelectedStatus(null)} />
+          selected={status === null} onClick={() => setStatus(null)} />
         <KpiCard label="В работе" value={stats.totals.active + (stats.totals.rejected ?? 0)} pct={pct(stats.totals.active + (stats.totals.rejected ?? 0))} icon={Clock} tone="amber"
-          selected={selectedStatus === "В работе"} onClick={() => toggleStatus("В работе")} />
+          selected={status === "В работе"} onClick={() => toggleStatus("В работе")} />
         <KpiCard label="Исполнено" value={stats.totals.done} pct={pct(stats.totals.done)} icon={CheckCircle2} tone="green"
-          selected={selectedStatus === "Исполнено"} onClick={() => toggleStatus("Исполнено")} />
+          selected={status === "Исполнено"} onClick={() => toggleStatus("Исполнено")} />
         <KpiCard label="Снято с контроля" labelShort="Снято" value={stats.totals.excluded} pct={pct(stats.totals.excluded)} icon={Ban} tone="slate"
-          selected={selectedStatus === "Для снятия с контроля"} onClick={() => toggleStatus("Для снятия с контроля")} />
+          selected={status === "Для снятия с контроля"} onClick={() => toggleStatus("Для снятия с контроля")} />
       </div>
 
-      {selectedStatus && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 8, background: `${STATUS_COLOR_MAP[selectedStatus]}18`, border: `1px solid ${STATUS_COLOR_MAP[selectedStatus]}44`, fontSize: 13 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLOR_MAP[selectedStatus], flexShrink: 0 }} />
-          <span style={{ color: "hsl(var(--foreground))", fontWeight: 500 }}>Фильтр: <strong>{selectedStatus}</strong></span>
-          <button onClick={() => setSelectedStatus(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "hsl(var(--muted-foreground))", padding: "0 4px" }}>✕ Сбросить</button>
-        </div>
-      )}
+      <FilterChipBar />
 
       {/* Общий прогресс */}
       <div className="card" style={{ padding: "14px 20px" }}>
@@ -337,7 +374,7 @@ export default function DashboardPage({
             <div className="card-meta">{onDrillDown ? "Нажмите на столбец — откроется список рекомендаций" : "Структура статусов"}</div>
           </div>
           <ChartErrorBoundary>
-          <Bar key={`cycle-bar-${selectedStatus ?? "all"}`} data={cycleStackedData} options={{
+          <Bar key={`cycle-bar-${status ?? "all"}`} data={cycleStackedData} options={{
             responsive: true, maintainAspectRatio: true,
             onClick: handleCycleChartClick,
             onHover: (event: any, elements: any[]) => {
@@ -384,15 +421,18 @@ export default function DashboardPage({
 
       {/* Лидеры по сферам + Топ ведомств — analyst / admin */}
       {isAnalyst && (
-        <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
-          <div className="card chart-card">
+        <div className="dashboard-2col">
+          <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
             <div className="card-title-row">
               <div className="card-title">
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <Trophy size={14} />Лидеры по сферам
                 </span>
               </div>
-              <div className="card-meta">по % исполнения</div>
+              <div className="card-meta" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                по % исполнения
+                {status && <PartialFilterBadge />}
+              </div>
             </div>
             {(stats.bySphereStatus ?? []).length === 0 ? (
               <EmptyState icon={BarChart2} title="Нет данных по сферам" />
@@ -407,19 +447,25 @@ export default function DashboardPage({
               </ChartErrorBoundary>
             )}
           </div>
-          <RankedOwnersCard
-            onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
-          />
+          <div data-filtered={status ? "partial" : undefined}>
+            <RankedOwnersCard
+              onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
+              partialFilter={!!status}
+            />
+          </div>
         </div>
       )}
 
       {/* Форма закрытия + Очередь действий — analyst / admin */}
       {isAnalyst && (
-        <div className="dashboard-2col" style={dimStyle} title={dimTitle}>
-          <div className="card chart-card">
+        <div className="dashboard-2col">
+          <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
             <div className="card-title-row">
               <div className="card-title">Форма закрытия</div>
-              <div className="card-meta">как закрываются исполненные рекомендации</div>
+              <div className="card-meta" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                как закрываются исполненные рекомендации
+                {status && <PartialFilterBadge />}
+              </div>
             </div>
             {(stats.byCompletionForm ?? []).length === 0 ? (
               <EmptyState icon={BarChart2} title="Нет данных по форме закрытия" description="Появятся после накопления исполненных рекомендаций" />
@@ -434,19 +480,36 @@ export default function DashboardPage({
               </ChartErrorBoundary>
             )}
           </div>
-          <ActionQueueCard
-            onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
-          />
+          <div data-filtered={status ? "partial" : undefined}>
+            <ActionQueueCard
+              onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
+              partialFilter={!!status}
+            />
+          </div>
         </div>
       )}
 
       {/* Сферы × циклы — analyst / admin */}
       {isAnalyst && (
-        <SphereCycleCard
-          onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
-        />
+        <div data-filtered={status ? "partial" : undefined}>
+          <SphereCycleCard
+            onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
+            partialFilter={!!status}
+          />
+        </div>
       )}
 
     </div>
+  );
+}
+
+export default function DashboardPage(props: {
+  onDrillDown?: (f: RegistryDrillDown) => void;
+  role?: DashboardRole;
+}) {
+  return (
+    <DashboardFilterProvider>
+      <DashboardInner {...props} />
+    </DashboardFilterProvider>
   );
 }

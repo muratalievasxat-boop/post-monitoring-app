@@ -20,8 +20,10 @@ function readMode(): Mode {
 
 export default function SphereCycleCard({
   onClickCell,
+  partialFilter = false,
 }: {
   onClickCell?: (sphere: string, cycle?: string) => void;
+  partialFilter?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>(readMode);
 
@@ -76,10 +78,17 @@ export default function SphereCycleCard({
         </div>
       </div>
 
-      <div className="card-meta" style={{ marginBottom: 12 }}>
-        {mode === "heatmap"
-          ? "% исполнения — сфера × цикл · нажмите ячейку для фильтрации"
-          : "размер = кол-во, цвет = % исполнения · нажмите блок для фильтрации"}
+      <div className="card-meta" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+        <span>
+          {mode === "heatmap"
+            ? "% исполнения — сфера × цикл · нажмите ячейку для фильтрации"
+            : "размер = кол-во, цвет = % исполнения · нажмите блок для фильтрации"}
+        </span>
+        {partialFilter && (
+          <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 6px", background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", borderRadius: 4, border: "1px solid hsl(var(--border))", whiteSpace: "nowrap" }}>
+            фильтр не применён
+          </span>
+        )}
       </div>
 
       {isLoading ? (

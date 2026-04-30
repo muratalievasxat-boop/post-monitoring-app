@@ -31,9 +31,11 @@ const PREVIEW_LIMIT = 5;
 export default function ActionQueueCard({
   limit = 20,
   onItemClick,
+  partialFilter = false,
 }: {
   limit?: number;
   onItemClick?: (responsible: string) => void;
+  partialFilter?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -58,7 +60,14 @@ export default function ActionQueueCard({
             <AlertCircle size={14} />Очередь действий
           </span>
         </div>
-        <div className="card-meta">просроченные активные рекомендации</div>
+        <div className="card-meta" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          просроченные активные рекомендации
+          {partialFilter && (
+            <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 6px", background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", borderRadius: 4, border: "1px solid hsl(var(--border))", whiteSpace: "nowrap" }}>
+              фильтр не применён
+            </span>
+          )}
+        </div>
       </div>
 
       {!isEmpty && (
