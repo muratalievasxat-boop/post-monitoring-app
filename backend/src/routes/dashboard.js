@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardSummary, getStatusTrends, getActionQueue, getSphereCycleMatrix, getSphereTotals, getOwnersRanking } from '../db/queries/recommendations.js';
+import { getDashboardSummary, getStatusTrends, getActionQueue, getSphereCycleMatrix, getSphereTotals, getOwnersRanking, getCycleFunnel } from '../db/queries/recommendations.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -65,6 +65,18 @@ router.get('/action-queue', authMiddleware, nonTd, async (req, res) => {
   } catch (error) {
     console.error('action-queue error:', error);
     res.status(500).json({ error: 'Failed to load action queue' });
+  }
+});
+
+router.get('/cycle-funnel', authMiddleware, nonTd, async (req, res) => {
+  try {
+    const cycle = String(req.query.cycle ?? '').trim();
+    if (!cycle) return res.status(400).json({ error: 'cycle required' });
+    const data = await getCycleFunnel(cycle);
+    res.json(data);
+  } catch (error) {
+    console.error('cycle-funnel error:', error);
+    res.status(500).json({ error: 'Failed to load cycle funnel' });
   }
 });
 

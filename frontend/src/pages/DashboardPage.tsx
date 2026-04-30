@@ -18,6 +18,8 @@ import SphereCycleCard from "@/components/dashboard/SphereCycleCard";
 import RankedOwnersCard from "@/components/dashboard/RankedOwnersCard";
 import { DashboardFilterProvider, useDashboardFilters, type StatusFilter } from "@/lib/dashboardFilters";
 import { useChartTheme, withAlpha } from "@/lib/chartTheme";
+import CycleFunnel from "@/components/charts/CycleFunnel";
+import SavedViewsBar from "@/components/dashboard/SavedViewsBar";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -347,6 +349,7 @@ function DashboardInner({
       </div>
 
       <FilterChipBar />
+      <SavedViewsBar />
 
       {/* Общий прогресс */}
       <div className="card" style={{ padding: "14px 20px" }}>
@@ -426,6 +429,14 @@ function DashboardInner({
           </ChartErrorBoundary>
         </div>
       </div>
+
+      {/* Воронка цикла — analyst / admin */}
+      {isAnalyst && (() => {
+        const cycles = (stats.byCycleStatus ?? [])
+          .map(x => x.cycle)
+          .filter(c => c !== 'Без цикла');
+        return cycles.length > 0 ? <CycleFunnel cycles={cycles} /> : null;
+      })()}
 
       {/* Лидеры по сферам + Топ ведомств — analyst / admin */}
       {isAnalyst && (

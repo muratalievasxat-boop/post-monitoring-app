@@ -576,6 +576,26 @@ export async function getActionQueue(limit = 20) {
   };
 }
 
+export async function getCycleFunnel(cycle) {
+  const activeSql   = `(status_normalized ilike 'в работе%' or status_normalized = 'Не поддерживается')`;
+  const doneSql     = `status_normalized ilike 'исполнено%'`;
+  const excludedSql = `(status_normalized ilike 'не поддерживается%исключ%' or status_normalized = 'Для снятия с контроля')`;
+
+  const { rows } = await pool.query(`
+    select
+      btrim(cycle) as cycle,
+      count(*)::int                                            as total,
+      count(*) filter (where ${activeSql})::int               as active,
+      count(*) filter (where ${doneSql})::int                 as done,
+      count(*) filter (where ${excludedSql})::int             as excluded
+    from recommendations
+    where btrim(cycle) = $1
+    group by btrim(cycle)
+  `, [String(cycle ?? '').trim()]);
+
+  return rows[0] ?? null;
+}
+
 export async function getStatusTrends(weeks = 12) {
   const w = Math.min(Math.max(Number(weeks) || 12, 1), 52);
 
