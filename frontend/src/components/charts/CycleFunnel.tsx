@@ -76,7 +76,6 @@ export default function CycleFunnel({ cycles }: { cycles: string[] }) {
 
   const rows: BarRow[] = data
     ? [
-        { label: 'Всего',            count: data.total,    color: ct.muted },
         { label: 'В работе',         count: data.active,   color: ct.statusActive },
         { label: 'Исполнено',        count: data.done,     color: ct.statusDone },
         { label: 'Снято с контроля', count: data.excluded, color: ct.statusExcluded },
@@ -118,12 +117,12 @@ export default function CycleFunnel({ cycles }: { cycles: string[] }) {
       </div>
 
       <div className="card-meta" style={{ marginBottom: 16 }}>
-        распределение статусов внутри цикла
+        {data ? `${data.total.toLocaleString('ru')} рекомендаций · распределение статусов` : 'распределение статусов внутри цикла'}
       </div>
 
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[0, 1, 2, 3].map(i => (
+          {[0, 1, 2].map(i => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div className="skeleton" style={{ width: 130, height: 14, borderRadius: 4, flexShrink: 0 }} />
               <div className="skeleton" style={{ flex: 1, height: 30, borderRadius: 7 }} />
