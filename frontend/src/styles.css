@@ -144,6 +144,8 @@
   --status-active: 35 91% 48%;
   --status-excluded: 217 19% 55%;
   --status-overdue: 0 72% 51%;
+  --chart-monitoring: 262 80% 58%;
+  --chart-grid: rgba(100, 116, 139, 0.12);
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
   --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.12);
@@ -181,6 +183,8 @@
   --status-active: 35 91% 55%;
   --status-excluded: 217 19% 65%;
   --status-overdue: 0 72% 60%;
+  --chart-monitoring: 262 80% 70%;
+  --chart-grid: rgba(148, 163, 184, 0.15);
 }
 
 *,

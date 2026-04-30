@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useChartTheme, withAlpha } from '@/lib/chartTheme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend,
@@ -48,17 +49,18 @@ function KpiCard({ label, value, color, icon: Icon }: { label: string; value: nu
 // ─── HBarChart ────────────────────────────────────────────────────────────────
 
 function HBarChart({ labels, values, color }: { labels: string[]; values: number[]; color: string }) {
+  const ct = useChartTheme();
   const h = Math.max(80, labels.length * 34 + 48);
   return (
     <div style={{ height: h, position: 'relative' }}>
       <Bar
-        data={{ labels, datasets: [{ data: values, backgroundColor: color + 'bb', hoverBackgroundColor: color, borderRadius: 3, barPercentage: 0.7 }] }}
+        data={{ labels, datasets: [{ data: values, backgroundColor: withAlpha(color, 0.73), hoverBackgroundColor: color, borderRadius: 3, barPercentage: 0.7 }] }}
         options={{
           indexAxis: 'y', responsive: true, maintainAspectRatio: false,
           layout: { padding: { right: 32 } },
           scales: {
-            x: { min: 0, border: { display: false }, grid: { color: 'rgba(100,116,139,0.12)' }, ticks: { color: '#64748b', font: { size: 10 } } },
-            y: { border: { display: false }, grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 }, callback: (_: unknown, i: number) => { const l = labels[i] ?? ''; return l.length > 28 ? l.slice(0, 26) + '…' : l; } } },
+            x: { min: 0, border: { display: false }, grid: { color: ct.grid }, ticks: { color: ct.muted, font: { size: 10 } } },
+            y: { border: { display: false }, grid: { display: false }, ticks: { color: ct.muted, font: { size: 10 }, callback: (_: unknown, i: number) => { const l = labels[i] ?? ''; return l.length > 28 ? l.slice(0, 26) + '…' : l; } } },
           },
           plugins: {
             legend: { display: false },
@@ -172,6 +174,7 @@ function TdDetailModal({ tdName, onClose }: { tdName: string; onClose: () => voi
 export default function CasesDashboardPage() {
   const qc = useQueryClient();
   const [detailTd, setDetailTd] = useState<string | null>(null);
+  const ct = useChartTheme();
 
   const { data: stats, isLoading } = useQuery<Stats>({
     queryKey: ['/api/cases/stats'],
@@ -210,17 +213,17 @@ export default function CasesDashboardPage() {
         <div className="card chart-card">
           <div className="card-title-row"><div className="card-title">🏆 Топ ТД по принятым</div></div>
           {topTd.length === 0 ? <div style={{ color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>Нет данных</div>
-            : <HBarChart labels={topTd.map(r => r.td_name)} values={topTd.map(r => r.accepted)} color="#2563eb" />}
+            : <HBarChart labels={topTd.map(r => r.td_name)} values={topTd.map(r => r.accepted)} color={ct.analiz} />}
         </div>
         <div className="card chart-card">
           <div className="card-title-row"><div className="card-title">🔴 Аутсайдеры (&lt;50%)</div></div>
           {outsiders.length === 0 ? <div style={{ color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>Все ТД выше 50%</div>
-            : <HBarChart labels={outsiders.map(r => r.td_name)} values={outsiders.map(r => pct(r.accepted, r.total))} color="#dc2626" />}
+            : <HBarChart labels={outsiders.map(r => r.td_name)} values={outsiders.map(r => pct(r.accepted, r.total))} color={ct.statusOverdue} />}
         </div>
         <div className="card chart-card">
           <div className="card-title-row"><div className="card-title">📂 Принятые по сферам</div></div>
           {bySphere.length === 0 ? <div style={{ color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>Нет данных</div>
-            : <HBarChart labels={bySphere.map(r => r.sphere)} values={bySphere.map(r => r.count)} color="#7c3aed" />}
+            : <HBarChart labels={bySphere.map(r => r.sphere)} values={bySphere.map(r => r.count)} color={ct.monitoring} />}
         </div>
       </div>
 

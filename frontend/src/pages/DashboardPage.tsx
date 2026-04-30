@@ -17,6 +17,7 @@ import TrendCard from "@/components/charts/TrendCard";
 import SphereCycleCard from "@/components/dashboard/SphereCycleCard";
 import RankedOwnersCard from "@/components/dashboard/RankedOwnersCard";
 import { DashboardFilterProvider, useDashboardFilters, type StatusFilter } from "@/lib/dashboardFilters";
+import { useChartTheme, withAlpha } from "@/lib/chartTheme";
 
 ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, ChartDataLabels);
 
@@ -54,15 +55,14 @@ interface DashboardSummary {
   byCompletionForm: { completion_form: string; total: number; done: number; pct: number }[];
 }
 
-const C = { done: "#16a34a", active: "#d97706", rejected: "#dc2626", excluded: "#94a3b8", analiz: "#2563eb", monitoring: "#7c3aed" };
-
 const SPARKLINE_PLACEHOLDER: null[] = Array(10).fill(null);
 
 const STATUS_KEY_MAP: Record<string, keyof DashboardSummary["byCycleStatus"][0]> = {
   "Исполнено": "done", "В работе": "active", "Для снятия с контроля": "excluded",
 };
+// Static hex used only for non-chart UI (chip backgrounds, KPI rings)
 const STATUS_COLOR_MAP: Record<string, string> = {
-  "Исполнено": C.done, "В работе": C.active, "Для снятия с контроля": C.excluded,
+  "Исполнено": "#16a34a", "В работе": "#d97706", "Для снятия с контроля": "#94a3b8",
 };
 
 const CYCLE_STATUS_LABELS = ["Исполнено", "В работе", "Для снятия с контроля"] as const;
@@ -124,11 +124,12 @@ function KpiCard({ label, labelShort, value, pct, sub, icon: Icon, tone, selecte
 function HBarChart({ labels, values, color, isCount, onClickLabel }: {
   labels: string[]; values: number[]; color: string; isCount?: boolean; onClickLabel?: (label: string) => void;
 }) {
+  const ct = useChartTheme();
   const h = Math.max(100, labels.length * 34 + 52);
   return (
     <div style={{ height: h, position: "relative" }}>
       <Bar
-        data={{ labels, datasets: [{ data: values, backgroundColor: color + "bb", hoverBackgroundColor: color, borderRadius: 3, barPercentage: 0.72 }] }}
+        data={{ labels, datasets: [{ data: values, backgroundColor: withAlpha(color, 0.73), hoverBackgroundColor: color, borderRadius: 3, barPercentage: 0.72 }] }}
         options={{
           indexAxis: "y" as const,
           responsive: true,
@@ -147,14 +148,14 @@ function HBarChart({ labels, values, color, isCount, onClickLabel }: {
               min: 0,
               ...(!isCount ? { max: 100 } : {}),
               border: { display: false },
-              grid: { color: "rgba(100,116,139,0.12)" },
-              ticks: { color: "#64748b", font: { size: 10 }, callback: (v: any) => isCount ? v : v + "%" },
+              grid: { color: ct.grid },
+              ticks: { color: ct.muted, font: { size: 10 }, callback: (v: any) => isCount ? v : v + "%" },
             },
             y: {
               border: { display: false },
               grid: { display: false },
               ticks: {
-                color: "#64748b", font: { size: 10 },
+                color: ct.muted, font: { size: 10 },
                 callback: (_: any, i: number) => { const l = labels[i] || ""; return l.length > 26 ? l.slice(0, 24) + "…" : l; },
               },
             },
@@ -233,6 +234,7 @@ function DashboardInner({
 }) {
   const isAnalyst = role === 'admin' || role === 'analyst';
   const { status, setStatus } = useDashboardFilters();
+  const ct = useChartTheme();
 
   const { data: stats, isLoading, error, refetch } = useQuery<DashboardSummary>({
     queryKey: ["/api/dashboard/summary"],
@@ -258,6 +260,10 @@ function DashboardInner({
     if (cycle) onDrillDown({ cycle });
   }, [stats, onDrillDown]);
 
+  const statusChartColor: Record<string, string> = {
+    "Исполнено": ct.statusDone, "В работе": ct.statusActive, "Для снятия с контроля": ct.statusExcluded,
+  };
+
   const cycleStackedData = useMemo(() => {
     const items = stats?.byCycleStatus ?? [];
     const labels = items.map((x) => `Цикл ${x.cycle}`);
@@ -265,18 +271,19 @@ function DashboardInner({
       const key = STATUS_KEY_MAP[status];
       return {
         labels,
-        datasets: [{ label: status, data: items.map(x => x[key] as number), backgroundColor: STATUS_COLOR_MAP[status], borderRadius: 4, stack: undefined }],
+        datasets: [{ label: status, data: items.map(x => x[key] as number), backgroundColor: statusChartColor[status], borderRadius: 4, stack: undefined }],
       };
     }
     return {
       labels,
       datasets: [
-        { label: "Исполнено", data: items.map(x => x.done), backgroundColor: C.done, stack: "s" },
-        { label: "В работе", data: items.map(x => x.active), backgroundColor: C.active, stack: "s" },
-        { label: "Для снятия с контроля", data: items.map(x => x.excluded), backgroundColor: C.excluded, stack: "s" },
+        { label: "Исполнено",               data: items.map(x => x.done),     backgroundColor: ct.statusDone,     stack: "s" },
+        { label: "В работе",                data: items.map(x => x.active),   backgroundColor: ct.statusActive,   stack: "s" },
+        { label: "Для снятия с контроля",   data: items.map(x => x.excluded), backgroundColor: ct.statusExcluded, stack: "s" },
       ],
     };
-  }, [stats, status]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats, status, ct]);
 
   const cycleLineData = useMemo(() => {
     const items = stats?.byCycleTypeCompletion ?? [];
@@ -286,18 +293,19 @@ function DashboardInner({
         {
           label: "Анализ (% исполнения)",
           data: items.map(x => x.analiz_total > 0 ? Math.round(x.analiz_done / x.analiz_total * 100) : 0),
-          borderColor: C.analiz, backgroundColor: C.analiz + "22",
+          borderColor: ct.analiz, backgroundColor: withAlpha(ct.analiz, 0.13),
           tension: 0.3, pointRadius: 4, pointHoverRadius: 6, fill: false,
         },
         {
           label: "Мониторинг (% исполнения)",
           data: items.map(x => x.monitoring_total > 0 ? Math.round(x.monitoring_done / x.monitoring_total * 100) : 0),
-          borderColor: C.monitoring, backgroundColor: C.monitoring + "22",
+          borderColor: ct.monitoring, backgroundColor: withAlpha(ct.monitoring, 0.13),
           tension: 0.3, pointRadius: 4, pointHoverRadius: 6, fill: false,
         },
       ],
     };
-  }, [stats]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats, ct]);
 
   if (isLoading) return (
     <div className="content" style={{ gap: 16 }}>
@@ -386,8 +394,8 @@ function DashboardInner({
               datalabels: { display: false },
             },
             scales: {
-              x: { stacked: true, ticks: { color: "#64748b", font: { size: 11 } } },
-              y: { stacked: true, ticks: { color: "#64748b", font: { size: 11 } } },
+              x: { stacked: true, ticks: { color: ct.muted, font: { size: 11 } } },
+              y: { stacked: true, ticks: { color: ct.muted, font: { size: 11 } } },
             },
           }} />
           </ChartErrorBoundary>
@@ -411,8 +419,8 @@ function DashboardInner({
               datalabels: { display: false },
             },
             scales: {
-              x: { ticks: { color: "#64748b", font: { size: 11 } } },
-              y: { min: 0, max: 100, ticks: { color: "#64748b", font: { size: 11 }, callback: (v: any) => v + "%" } },
+              x: { ticks: { color: ct.muted, font: { size: 11 } } },
+              y: { min: 0, max: 100, ticks: { color: ct.muted, font: { size: 11 }, callback: (v: any) => v + "%" } },
             },
           }} />
           </ChartErrorBoundary>
@@ -441,7 +449,7 @@ function DashboardInner({
               <HBarChart
                 labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
                 values={(stats.bySphereStatus ?? []).map(r => r.pct)}
-                color={C.analiz}
+                color={ct.analiz}
                 onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
               />
               </ChartErrorBoundary>
@@ -474,7 +482,7 @@ function DashboardInner({
               <HBarChart
                 labels={(stats.byCompletionForm ?? []).map(r => r.completion_form)}
                 values={(stats.byCompletionForm ?? []).map(r => r.total)}
-                color={C.monitoring}
+                color={ct.monitoring}
                 isCount
               />
               </ChartErrorBoundary>
