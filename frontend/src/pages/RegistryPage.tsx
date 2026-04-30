@@ -581,6 +581,39 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
             </table>
           </div>
 
+          {/* ── Mobile card list (hidden on desktop via CSS) ── */}
+          <div className="registry-mobile-cards">
+            {rows.length === 0 ? (
+              <div style={{ padding: "24px", textAlign: "center", fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
+                Нет данных для отображения
+              </div>
+            ) : rows.map(item => (
+              <div key={item.id} className="rec-card" onClick={() => setDetailItem(item)}>
+                <div className="rec-card-top">
+                  {item.cycle && <span className="rec-card-cycle">Цикл {item.cycle}</span>}
+                  <span style={{ ...statusBadgeStyle(item.status_normalized), fontSize: 11, padding: "1px 6px" }}>
+                    {normalizeLabel(item.status_normalized) || "Нет статуса"}
+                  </span>
+                  {item.due_raw && <span className="rec-card-due">{item.due_raw}</span>}
+                </div>
+                <div className="rec-card-proposal">{item.proposal_text || "—"}</div>
+                <div className="rec-card-meta">
+                  {item.sphere_normalized && (
+                    <span className="rec-card-meta-item">{item.sphere_normalized}</span>
+                  )}
+                  {item.sphere_normalized && (item.responsible?.primary || item.responsible_org) && (
+                    <span className="rec-card-meta-dot">·</span>
+                  )}
+                  {(item.responsible?.primary || item.responsible_org) && (
+                    <span className="rec-card-meta-item">
+                      {item.responsible?.primary || item.responsible_org}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div className="pager">
             <button className="btn-secondary" disabled={currentPage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
               Назад

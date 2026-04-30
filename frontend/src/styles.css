@@ -2307,3 +2307,143 @@ button {
     height: 120px;
   }
 }
+
+/* ─── REGISTRY MOBILE CARD VIEW ──────────────── */
+.registry-mobile-cards {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rec-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.rec-card:active {
+  background: hsl(var(--muted));
+}
+
+.rec-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-height: 22px;
+}
+
+.rec-card-cycle {
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.rec-card-due {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.rec-card-proposal {
+  font-size: 13px;
+  color: hsl(var(--foreground));
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.rec-card-meta {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.rec-card-meta-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-card-meta-dot {
+  flex-shrink: 0;
+  opacity: 0.4;
+}
+
+@media (max-width: 767px) {
+  /* Show cards, hide table */
+  .table-wrap {
+    display: none !important;
+  }
+
+  .registry-mobile-cards {
+    display: flex;
+  }
+
+  /* Filters → horizontal scroll strip */
+  .filters-row {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 2px;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .filters-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .search-input {
+    flex: 0 0 auto !important;
+    width: 200px !important;
+    min-width: 0 !important;
+  }
+
+  .filter-select {
+    flex: 0 0 auto !important;
+    width: 130px !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Bigger pager buttons */
+  .pager .btn-secondary {
+    height: 44px;
+    padding: 0 20px;
+    font-size: 14px;
+    border-radius: 10px;
+    flex: 1;
+  }
+
+  .pager-info {
+    text-align: center;
+    min-width: 70px;
+    flex-shrink: 0;
+  }
+}
