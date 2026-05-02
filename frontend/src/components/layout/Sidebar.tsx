@@ -19,6 +19,12 @@ const mainItems = [
   { id: 'export'    as TabId, label: 'Администрирование', icon: Settings },
 ];
 
+function userInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLogout, isOpen = false }) => {
   const isTd      = user?.role === 'td';
   const isViewer  = user?.role === 'viewer';
@@ -35,10 +41,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
   return (
     <aside className={`sidebar${isOpen ? ' sidebar--open' : ''}`}>
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">М</div>
+        <div className="sidebar-brand-mark">МР</div>
         <div>
-          <div className="sidebar-brand-title">Мониторинг</div>
-          <div className="sidebar-brand-sub">Дебюрократизация</div>
+          <div className="sidebar-brand-title">Мониторинг<br/>рекомендаций</div>
+          <div className="sidebar-brand-sub">АДГС</div>
         </div>
       </div>
 
@@ -57,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
 
         {showCases && (
           <>
-            <div style={{ margin: '12px 12px 4px', fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <div className="sidebar-section-label" style={{ marginTop: 10 }}>
               Кейсы ТД
             </div>
             <button
@@ -93,20 +99,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
       </nav>
 
       {user && (
-        <div style={{ padding: '12px 16px', borderTop: '1px solid hsl(var(--border))', marginTop: 'auto' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'hsl(var(--foreground))', marginBottom: 2 }}>{user.name}</div>
-          <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginBottom: 8 }}>{user.role}</div>
-          <button
-            type="button"
-            onClick={onLogout}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
-              cursor: 'pointer', fontSize: 12, color: 'hsl(var(--muted-foreground))', padding: 0,
-            }}
-          >
-            <LogOut size={13} />
-            Выйти
-          </button>
+        <div className="sidebar-foot">
+          <div className="sidebar-avatar">
+            {userInitials(user.name)}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'hsl(var(--fg-headline))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user.name}
+            </div>
+            <div style={{ fontSize: 11, color: 'hsl(var(--fg-meta))', marginBottom: 6 }}>{user.role}</div>
+            <button
+              type="button"
+              onClick={onLogout}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
+                cursor: 'pointer', fontSize: 12, color: 'hsl(var(--fg-meta))', padding: 0,
+              }}
+            >
+              <LogOut size={13} />
+              Выйти
+            </button>
+          </div>
         </div>
       )}
     </aside>
