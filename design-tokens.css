@@ -1,0 +1,132 @@
+/* Post-Monitoring Redesign — Design Tokens
+   Deep navy / cold / government-grade / Bloomberg-density */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Surfaces */
+  --bg-0: #07101C;        /* page */
+  --bg-1: #0A1320;        /* card base */
+  --bg-2: #0F1B2E;        /* card surface */
+  --bg-3: #15243C;        /* elevated / hover */
+  --bg-4: #1B2D4A;        /* highest / popover */
+
+  /* Borders */
+  --line-1: #18253D;      /* hairline */
+  --line-2: #22344F;      /* divider */
+  --line-3: #2D446A;      /* strong border */
+
+  /* Text */
+  --fg-0: #F4F7FC;        /* headline */
+  --fg-1: #E1E8F2;        /* body */
+  --fg-2: #9AAFCC;        /* secondary */
+  --fg-3: #6B819F;        /* meta / muted */
+  --fg-4: #4A5E7C;        /* dim / disabled */
+
+  /* Brand / accent */
+  --accent: #38BDF8;      /* sky-400, primary cyan */
+  --accent-2: #0EA5E9;    /* sky-500 */
+  --accent-soft: rgba(56,189,248,0.12);
+  --indigo: #818CF8;      /* secondary accent */
+
+  /* Status semantics — government-grade, not jelly */
+  --done: #34D399;        /* emerald-400 */
+  --done-soft: rgba(52,211,153,0.14);
+  --active: #F59E0B;      /* amber-500 */
+  --active-soft: rgba(245,158,11,0.14);
+  --excluded: #94A3B8;    /* slate-400 */
+  --excluded-soft: rgba(148,163,184,0.14);
+  --critical: #FB7185;    /* rose-400 */
+  --critical-soft: rgba(251,113,133,0.14);
+  --warn: #FBBF24;        /* amber-400 */
+
+  /* Map / scoring scale (cold, no red—orange→cyan) */
+  --map-good: #34D399;
+  --map-mid: #F59E0B;
+  --map-bad: #FB7185;
+  --map-na: #2D446A;
+
+  /* Type */
+  --font-sans: 'Inter Tight', -apple-system, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Radii */
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-4: 14px;
+
+  /* Shadows — restrained */
+  --shadow-1: 0 1px 0 rgba(255,255,255,0.02) inset;
+  --shadow-2: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-pop: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 1px var(--line-2);
+
+  /* Density */
+  --gap-xs: 4px;
+  --gap-s: 8px;
+  --gap-m: 12px;
+  --gap-l: 16px;
+  --gap-xl: 24px;
+  --gap-xxl: 32px;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg-0);
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+}
+
+button { font-family: inherit; }
+.num, .tnum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+/* Scrollbars (subtle, dark) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px; border: 2px solid var(--bg-0); }
+::-webkit-scrollbar-thumb:hover { background: var(--line-3); }
+
+/* Reusable card */
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-1);
+}
+.card-hd {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 14px 18px 10px; border-bottom: 1px solid var(--line-1);
+}
+.card-title {
+  font-size: 12px; font-weight: 600; color: var(--fg-1);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.card-meta {
+  font-size: 11px; color: var(--fg-3);
+  font-family: var(--font-mono);
+}
+
+/* Pills / badges */
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 500;
+  border: 1px solid transparent;
+}
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+.pill-done   { background: var(--done-soft);     color: var(--done);     border-color: rgba(52,211,153,0.25); }
+.pill-active { background: var(--active-soft);   color: var(--active);   border-color: rgba(245,158,11,0.25); }
+.pill-excl   { background: var(--excluded-soft); color: var(--excluded); border-color: rgba(148,163,184,0.25); }
+.pill-crit   { background: var(--critical-soft); color: var(--critical); border-color: rgba(251,113,133,0.25); }
+
+/* Top-level utility */
+.row { display: flex; }
+.col { display: flex; flex-direction: column; }
+.gap-s { gap: var(--gap-s); } .gap-m { gap: var(--gap-m); } .gap-l { gap: var(--gap-l); } .gap-xl { gap: var(--gap-xl); }
+.muted { color: var(--fg-3); }
+.dim { color: var(--fg-4); }
