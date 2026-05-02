@@ -68,51 +68,34 @@ const CYCLE_STATUS_LABELS = ["Исполнено", "В работе", "Для с
 
 type DashboardRole = 'admin' | 'analyst' | 'viewer';
 
-function KpiCard({ label, labelShort, value, pct, sub, icon: Icon, tone, selected, onClick }: {
-  label: string; labelShort?: string; value: number; pct?: number; sub?: string; icon: any;
-  tone: "blue" | "amber" | "green" | "red" | "slate" | "violet";
+function KpiCard({ label, labelShort, value, pct, icon: Icon, tone, selected, onClick }: {
+  label: string; labelShort?: string; value: number; pct?: number; icon: any;
+  tone: "blue" | "amber" | "green" | "slate";
   selected?: boolean; onClick?: () => void;
 }) {
   return (
     <div
-      className={`kpi-card--${tone}`}
+      className={`kpi-card kpi-card--${tone}${selected ? ' selected' : ''}`}
       onClick={onClick}
-      style={{
-        background: "var(--kc-bg)",
-        border: selected ? "2px solid var(--kc-accent)" : "1px solid var(--kc-ring)",
-        borderRadius: 12,
-        padding: selected ? "11px 15px" : "12px 16px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 12,
-        cursor: onClick ? "pointer" : "default",
-        boxShadow: selected ? "0 0 0 3px var(--kc-ring)" : "none",
-        transition: "box-shadow 0.15s, border-color 0.15s",
-        userSelect: "none",
-      }}
       title={onClick ? (selected ? "Сбросить фильтр" : `Фильтр: ${label}`) : undefined}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--kc-accent)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-          {labelShort ? (
-            <>
-              <span className="kpi-label-full">{label}</span>
-              <span className="kpi-label-short">{labelShort}</span>
-            </>
-          ) : label}
+      <div className="kpi-top">
+        <div className="kpi-label">
+          {labelShort
+            ? <><span className="kpi-label-full">{label}</span><span className="kpi-label-short">{labelShort}</span></>
+            : label
+          }
         </div>
-        <div className="data-num" style={{ fontSize: 28, fontWeight: 700, color: "hsl(var(--foreground))", lineHeight: 1 }}>
-          {(value ?? 0).toLocaleString("ru")}
-        </div>
-        {pct !== undefined && (
-          <div className="data-num" style={{ fontSize: 12, color: "var(--kc-accent)", marginTop: 3, fontWeight: 600 }}>{pct}%</div>
-        )}
-        {sub && (
-          <div style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", marginTop: 2 }}>{sub}</div>
-        )}
+        <div className="kpi-icon"><Icon size={16} strokeWidth={1.5} /></div>
       </div>
-      <Icon size={24} color="var(--kc-accent)" strokeWidth={selected ? 2.5 : 1.5} />
+      <div className="kpi-value">{(value ?? 0).toLocaleString('ru')}</div>
+      <div className="kpi-foot">
+        {pct !== undefined
+          ? <span className="kpi-pct">{pct}%</span>
+          : <span />
+        }
+        <span className="kpi-delta kpi-delta--flat">— нет данных</span>
+      </div>
     </div>
   );
 }
@@ -198,7 +181,7 @@ function FilterChipBar() {
   if (chips.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderRadius: 8, background: "hsl(var(--muted))", border: "1px solid hsl(var(--border))" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderRadius: 8, background: "hsl(var(--bg-elevated))", border: "1px solid hsl(var(--border-hair))" }}>
       <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", fontWeight: 500 }}>Фильтр:</span>
       {chips.map(({ key, label, color, onRemove }) => (
         <div key={key} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, background: `${color}18`, border: `1px solid ${color}44` }}>
@@ -206,7 +189,7 @@ function FilterChipBar() {
           <button
             onClick={onRemove}
             aria-label={`Убрать фильтр ${label}`}
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "hsl(var(--muted-foreground))", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+            style={{ width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "hsl(var(--border-div))", cursor: "pointer", flexShrink: 0, fontSize: 11, color: "hsl(var(--fg-secondary))" }}
           >✕</button>
         </div>
       ))}
@@ -306,7 +289,7 @@ function DashboardInner({
 
   if (isLoading) return (
     <div className="content" style={{ gap: 16 }}>
-      <div className="dashboard-kpi-grid">
+      <div className="kpi-grid">
         {[0, 1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12 }} />)}
       </div>
       <div className="skeleton" style={{ height: 14, borderRadius: 8 }} />
@@ -332,7 +315,7 @@ function DashboardInner({
     <div className="content" style={{ gap: 16 }}>
 
       {/* KPI */}
-      <div className="dashboard-kpi-grid">
+      <div className="kpi-grid">
         <KpiCard label="Всего" value={stats.totals.all} icon={ListChecks} tone="blue"
           selected={status === null} onClick={() => setStatus(null)} />
         <KpiCard label="В работе" value={stats.totals.active + (stats.totals.rejected ?? 0)} pct={pct(stats.totals.active + (stats.totals.rejected ?? 0))} icon={Clock} tone="amber"

@@ -64,7 +64,7 @@ function barWidth(metric: Metric, row: OwnerRow, maxVal: number): number {
 }
 
 function rowValue(metric: Metric, row: OwnerRow): string {
-  if (metric === "volume")  return `${row.total} рек.`;
+  if (metric === "volume")   return `${row.total} рек.`;
   if (metric === "pct_done") return `${row.pct_done}%`;
   return String(row.overdue);
 }
@@ -119,110 +119,88 @@ export default function RankedOwnersCard({
 
   return (
     <>
-      <div className="card" style={{ position: "relative" }}>
+      <div className="card ro-card">
         {/* Header */}
-        <div className="card-title-row" style={{ alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <div className="card-title">
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <Users size={14} />Топ ведомств
-            </span>
+        <div className="ro-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span className="ro-title"><Users size={13} />Топ ведомств</span>
+            {partialFilter && (
+              <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 6px", background: "hsl(var(--bg-elevated))", color: "hsl(var(--fg-meta))", borderRadius: 4, border: "1px solid hsl(var(--border-hair))", whiteSpace: "nowrap" }}>
+                фильтр не применён
+              </span>
+            )}
           </div>
-          <div style={{ display: "flex", gap: 0, borderRadius: 7, border: "1px solid hsl(var(--border))", overflow: "hidden", flexShrink: 0 }}>
+
+          {/* Desktop segmented control */}
+          <div className="seg">
             {METRICS.map(({ key, label }) => (
               <button
                 key={key}
+                className={metric === key ? "on" : undefined}
                 onClick={() => handleMetric(key)}
-                style={{
-                  padding: "4px 10px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  background: metric === key ? "hsl(var(--foreground))" : "transparent",
-                  color: metric === key ? "hsl(var(--background))" : "hsl(var(--muted-foreground))",
-                  transition: "background 0.15s, color 0.15s",
-                  opacity: isFetching && metric !== key ? 0.6 : 1,
-                }}
+                style={{ opacity: isFetching && metric !== key ? 0.6 : 1 }}
               >
                 {label}
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="card-meta" style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <span>
-            {metric === "volume" && "по количеству рекомендаций"}
-            {metric === "pct_done" && "по доле исполненных"}
-            {metric === "overdue" && "по числу просроченных активных"}
-          </span>
-          {partialFilter && (
-            <span style={{ fontSize: 10, fontWeight: 500, padding: "2px 6px", background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", borderRadius: 4, border: "1px solid hsl(var(--border))", whiteSpace: "nowrap" }}>
-              фильтр не применён
-            </span>
-          )}
+          {/* Mobile select */}
+          <select
+            className="seg-mobile"
+            value={metric}
+            onChange={(e) => handleMetric(e.target.value as Metric)}
+          >
+            {METRICS.map(({ key, label }) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Rows */}
         {isLoading ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
             {Array.from({ length: PREVIEW }).map((_, i) => (
-              <div key={i} className="skeleton" style={{ height: 36, borderRadius: 6 }} />
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 16px", borderBottom: "1px solid hsl(var(--border-hair))" }}>
+                <div className="skeleton" style={{ width: 18, height: 12, borderRadius: 3, flexShrink: 0 }} />
+                <div className="skeleton" style={{ flex: 1, height: 14, borderRadius: 4 }} />
+                <div className="skeleton" style={{ width: 80, height: 6, borderRadius: 3 }} />
+                <div className="skeleton" style={{ width: 48, height: 14, borderRadius: 4 }} />
+              </div>
             ))}
           </div>
         ) : data.length === 0 ? (
-          <div style={{ padding: "24px 0", textAlign: "center", fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
+          <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: "hsl(var(--fg-meta))" }}>
             Недостаточно данных
           </div>
         ) : (
           <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {visibleRows.map((row) => {
+            <div>
+              {visibleRows.map((row, idx) => {
                 const bw = barWidth(metric, row, maxVal);
                 const bc = barColor(metric, row);
                 const val = rowValue(metric, row);
-                const truncOrg = row.org.length > 32 ? row.org.slice(0, 30) + "…" : row.org;
 
                 return (
                   <div
                     key={row.org}
+                    className="ro-row"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleRowClick(row)}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 2,
-                      padding: "6px 8px",
-                      borderRadius: 7,
-                      cursor: onItemClick || isMobile ? "pointer" : "default",
-                      minHeight: isMobile ? 48 : "auto",
-                      justifyContent: "center",
-                      transition: "background 0.1s",
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleRowClick(row);
+                      }
                     }}
-                    onMouseEnter={(e) => { if (!isMobile) (e.currentTarget as HTMLElement).style.background = "hsl(var(--muted))"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span style={{ fontSize: 12, color: "hsl(var(--foreground))", fontWeight: 500 }}>
-                        {truncOrg}
-                      </span>
-                      <span
-                        className="data-num"
-                        style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--foreground))", flexShrink: 0, marginLeft: 8 }}
-                      >
-                        {val}
-                      </span>
+                    <span className="ro-rank">{idx + 1}</span>
+                    <span className="ro-name">{row.org}</span>
+                    <div className="ro-bar">
+                      <div className="ro-bar-fill" style={{ width: `${bw}%`, background: bc }} />
                     </div>
-                    <div style={{ height: 4, background: "hsl(var(--border))", borderRadius: 2, overflow: "hidden" }}>
-                      <div
-                        style={{
-                          height: "100%",
-                          width: `${bw}%`,
-                          background: bc,
-                          borderRadius: 2,
-                          transition: "width 0.4s ease",
-                        }}
-                      />
-                    </div>
+                    <span className="ro-val">{val}</span>
                   </div>
                 );
               })}
@@ -232,15 +210,11 @@ export default function RankedOwnersCard({
               <button
                 onClick={() => setExpanded((e) => !e)}
                 style={{
-                  marginTop: 8,
-                  background: "none",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 6,
-                  padding: "8px 12px",
-                  fontSize: 12,
+                  width: "100%", padding: "10px", textAlign: "center",
+                  fontSize: 12, fontWeight: 600, color: "hsl(var(--accent))",
+                  background: "transparent", border: "none",
+                  borderTop: "1px solid hsl(var(--border-hair))",
                   cursor: "pointer",
-                  color: "hsl(var(--muted-foreground))",
-                  width: "100%",
                 }}
               >
                 {expanded ? "Свернуть" : `Развернуть до ${data.length}`}
@@ -253,49 +227,30 @@ export default function RankedOwnersCard({
       {/* Mobile bottom-sheet popover */}
       {popover && (
         <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 9999,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex", alignItems: "flex-end",
-          }}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end" }}
           onClick={() => setPopover(null)}
         >
           <div
-            style={{
-              background: "hsl(var(--card))",
-              padding: "24px 20px 32px",
-              borderRadius: "16px 16px 0 0",
-              width: "100%",
-              boxShadow: "0 -4px 24px rgba(0,0,0,0.2)",
-            }}
+            style={{ background: "hsl(var(--bg-card))", padding: "24px 20px 32px", borderRadius: "16px 16px 0 0", width: "100%", boxShadow: "0 -4px 24px rgba(0,0,0,0.2)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontWeight: 700, fontSize: 15, color: "hsl(var(--foreground))", marginBottom: 6 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "hsl(var(--fg-headline))", marginBottom: 6 }}>
               {popover.org}
             </div>
-            <div style={{ fontSize: 13, color: "hsl(var(--muted-foreground))", marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: "hsl(var(--fg-meta))", marginBottom: 20 }}>
               {popover.total} рек. · {popover.pct_done}% исп. · {popover.overdue} просрочены
             </div>
             {onItemClick && (
               <button
                 onClick={() => { onItemClick(popover.org); setPopover(null); }}
-                style={{
-                  width: "100%", padding: "13px", background: "#2563eb",
-                  color: "#fff", border: "none", borderRadius: 10,
-                  fontSize: 15, fontWeight: 600, cursor: "pointer",
-                }}
+                style={{ width: "100%", padding: "13px", background: "hsl(var(--accent))", color: "hsl(var(--bg-page))", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
               >
                 Открыть в реестре
               </button>
             )}
             <button
               onClick={() => setPopover(null)}
-              style={{
-                width: "100%", marginTop: 10, padding: "10px",
-                background: "none", border: "1px solid hsl(var(--border))",
-                borderRadius: 10, fontSize: 14, cursor: "pointer",
-                color: "hsl(var(--muted-foreground))",
-              }}
+              style={{ width: "100%", marginTop: 10, padding: "10px", background: "none", border: "1px solid hsl(var(--border-hair))", borderRadius: 10, fontSize: 14, cursor: "pointer", color: "hsl(var(--fg-meta))" }}
             >
               Закрыть
             </button>
