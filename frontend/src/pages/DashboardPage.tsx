@@ -9,7 +9,6 @@ import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Bar, Line } from "react-chartjs-2";
 import { CheckCircle2, Clock, Ban, ListChecks, Trophy, BarChart2 } from "lucide-react";
 import type { RegistryDrillDown } from "@/App";
-import Sparkline from "@/components/shared/Sparkline";
 import EmptyState from "@/components/shared/EmptyState";
 import ErrorState from "@/components/shared/ErrorState";
 import ActionQueueCard from "@/components/dashboard/ActionQueueCard";
@@ -56,8 +55,6 @@ interface DashboardSummary {
   byAttention: { responsible_org: string; total: number; done: number; pct: number }[];
   byCompletionForm: { completion_form: string; total: number; done: number; pct: number }[];
 }
-
-const SPARKLINE_PLACEHOLDER: null[] = Array(10).fill(null);
 
 const STATUS_KEY_MAP: Record<string, keyof DashboardSummary["byCycleStatus"][0]> = {
   "Исполнено": "done", "В работе": "active", "Для снятия с контроля": "excluded",
@@ -114,9 +111,6 @@ function KpiCard({ label, labelShort, value, pct, sub, icon: Icon, tone, selecte
         {sub && (
           <div style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", marginTop: 2 }}>{sub}</div>
         )}
-        <div style={{ marginTop: 8 }}>
-          <Sparkline values={SPARKLINE_PLACEHOLDER} color="var(--kc-accent)" height={24} />
-        </div>
       </div>
       <Icon size={24} color="var(--kc-accent)" strokeWidth={selected ? 2.5 : 1.5} />
     </div>
@@ -136,7 +130,7 @@ function HBarChart({ labels, values, color, isCount, onClickLabel }: {
           indexAxis: "y" as const,
           responsive: true,
           maintainAspectRatio: false,
-          layout: { padding: { right: 44 } },
+          layout: { padding: { right: 44, left: 8 } },
           onClick: (_: any, elements: any[]) => {
             if (!elements.length || !onClickLabel) return;
             onClickLabel(labels[elements[0].index]);
@@ -158,7 +152,7 @@ function HBarChart({ labels, values, color, isCount, onClickLabel }: {
               grid: { display: false },
               ticks: {
                 color: ct.muted, font: { size: 10 },
-                callback: (_: any, i: number) => { const l = labels[i] || ""; return l.length > 26 ? l.slice(0, 24) + "…" : l; },
+                callback: (_: any, i: number) => { const l = labels[i] || ""; return l.length > 18 ? l.slice(0, 16) + "…" : l; },
               },
             },
           },
@@ -211,7 +205,8 @@ function FilterChipBar() {
           <span style={{ fontSize: 12, fontWeight: 500, color: "hsl(var(--foreground))" }}>{label}</span>
           <button
             onClick={onRemove}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "0 2px", fontSize: 12, color: "hsl(var(--muted-foreground))", lineHeight: 1 }}
+            aria-label={`Убрать фильтр ${label}`}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "hsl(var(--muted-foreground))", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
           >✕</button>
         </div>
       ))}

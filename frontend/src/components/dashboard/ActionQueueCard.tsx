@@ -124,6 +124,9 @@ export default function ActionQueueCard({
                     fontWeight: 700,
                     lineHeight: "16px",
                     whiteSpace: "nowrap",
+                    maxWidth: 64,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
                   }}>
                     +{item.days_overdue}д
                   </span>

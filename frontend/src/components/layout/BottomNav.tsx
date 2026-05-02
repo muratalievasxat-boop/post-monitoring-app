@@ -17,14 +17,14 @@ const NAV_ITEMS: { id: TabId; label: string; icon: React.FC<{ size: number; stro
 ];
 
 export function BottomNav({ current, onChange, user, onOpenMore, isDrawerOpen }: BottomNavProps) {
-  const isMore = current !== 'dashboard' && current !== 'registry' && current !== 'cases';
+  const isMore = current !== 'dashboard' && current !== 'registry' && current !== 'cases' && current !== 'cases-dashboard';
 
   if (isDrawerOpen) return null;
 
   return (
     <nav className="bottom-nav" aria-label="Нижняя навигация">
       {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-        const isActive = current === id;
+        const isActive = current === id || (id === 'cases' && current === 'cases-dashboard');
         return (
           <button
             key={id}

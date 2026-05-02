@@ -22,7 +22,7 @@ const METRICS: { key: Metric; label: string }[] = [
 const STORAGE_KEY = "dashboard.ranked-owners.metric";
 const PREVIEW = 5;
 const LIMIT = 15;
-const MOBILE_BP = 640;
+const MOBILE_BP = 768;
 
 function readMetric(): Metric {
   try {

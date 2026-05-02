@@ -32,7 +32,7 @@ function FunnelBar({ label, count, total, color }: { label: string; count: numbe
   const pct = total > 0 ? Math.round(count / total * 100) : 0;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 130, fontSize: 12, color: 'hsl(var(--muted-foreground))', textAlign: 'right', flexShrink: 0, lineHeight: 1.3 }}>
+      <div style={{ width: 'clamp(70px, 28vw, 130px)', fontSize: 12, color: 'hsl(var(--muted-foreground))', textAlign: 'right', flexShrink: 0, lineHeight: 1.3 }}>
         {label}
       </div>
       <div style={{ flex: 1, height: 30, background: 'hsl(var(--muted))', borderRadius: 7, overflow: 'hidden', minWidth: 0 }}>
@@ -97,7 +97,8 @@ export default function CycleFunnel({ cycles }: { cycles: string[] }) {
             value={cycle}
             onChange={e => handleChange(e.target.value)}
             style={{
-              padding: '4px 10px',
+              padding: '8px 12px',
+              minHeight: 36,
               borderRadius: 7,
               border: '1px solid hsl(var(--border))',
               background: 'hsl(var(--background))',
