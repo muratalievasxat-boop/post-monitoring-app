@@ -108,7 +108,7 @@ export function App() {
         />
       )}
       <section className="main">
-        <Topbar title={title} theme={theme} onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')} onMenuToggle={() => setSidebarOpen(o => !o)} />
+        <Topbar title={title} theme={theme} onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')} onMenuToggle={() => setSidebarOpen(o => !o)} user={auth.user} />
         <main className="page-content">
           {tab === 'dashboard' && auth.user.role !== 'td' && (
             <DashboardPage onDrillDown={handleDrillDown} role={auth.user.role as 'admin' | 'analyst' | 'viewer'} />
