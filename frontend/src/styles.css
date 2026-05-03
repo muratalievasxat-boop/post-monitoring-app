@@ -2493,6 +2493,168 @@ button {
 }
 
  
+/* ── REDESIGN: HeatmapMatrix ── */
+.hm-card {
+  padding: 0;
+  overflow: hidden;
+}
+.hm-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid hsl(var(--border-hair));
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── REDESIGN: CycleFunnel ── */
+.funnel-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.funnel-label {
+  font-size: 12px;
+  color: hsl(var(--fg-secondary));
+}
+.funnel-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: hsl(var(--fg-body));
+  font-family: var(--font-mono);
+  text-align: right;
+}
+.funnel-pct {
+  font-size: 11px;
+  font-weight: 400;
+  color: hsl(var(--fg-meta));
+  margin-left: 4px;
+}
+.funnel-track {
+  height: 10px;
+  background: hsl(var(--bg-elevated));
+  border-radius: 6px;
+  overflow: hidden;
+}
+.funnel-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.45s ease;
+}
+.funnel-select {
+  padding: 8px 12px;
+  border-radius: 7px;
+  border: 1px solid hsl(var(--border-div));
+  background: hsl(var(--bg-elevated));
+  color: hsl(var(--fg-body));
+  font-size: 12px;
+  font-family: var(--font-sans);
+  min-height: 36px;
+  cursor: pointer;
+}
+@media (max-width: 767px) {
+  .funnel-select { min-height: 44px; }
+}
+
+/* ── REDESIGN: Progress bar ── */
+.progress-card {
+  padding: 14px 20px;
+}
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.progress-header-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--fg-body));
+}
+.progress-header-stat {
+  font-size: 12px;
+  color: hsl(var(--fg-meta));
+  font-family: var(--font-mono);
+}
+.progress-bar-track {
+  height: 10px;
+  background: hsl(var(--bg-elevated));
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  gap: 1px;
+}
+.progress-bar-segment {
+  height: 100%;
+  transition: width 0.5s ease;
+  border-radius: 2px;
+}
+.progress-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: hsl(var(--fg-secondary));
+  font-family: var(--font-mono);
+}
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── REDESIGN: Filter chips bar ── */
+.filter-chip-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: hsl(var(--bg-elevated));
+  border: 1px solid hsl(var(--border-div));
+  color: hsl(var(--fg-secondary));
+  font-family: var(--font-mono);
+}
+.filter-chip-close {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: hsl(var(--border-div));
+  color: hsl(var(--fg-meta));
+  font-size: 10px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+.filter-chip-close:hover { background: hsl(var(--status-overdue)); color: white; }
+.filter-chip-reset {
+  font-size: 11px;
+  color: hsl(var(--status-overdue));
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+
 /* ── REDESIGN: RankedOwnersCard ── */
 .ro-card {
   padding: 0;

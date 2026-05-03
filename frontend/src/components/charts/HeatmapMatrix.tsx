@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface HeatmapDatum {
   sphere: string;
@@ -20,7 +20,7 @@ function lerpHex(a: string, b: string, t: number): string {
 }
 
 function pctFill(pct: number | null): string {
-  if (pct === null) return "#e2e8f0";
+  if (pct === null) return "hsl(var(--bg-elevated))";
   const p = Math.max(0, Math.min(100, pct));
   return p < 50
     ? lerpHex("#dc2626", "#d97706", p / 50)
@@ -31,7 +31,10 @@ function textColor(rgb: string): string {
   const m = rgb.match(/\d+/g);
   if (!m) return "#fff";
   const [r, g, b] = m.map(Number);
-  const toLin = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+  const toLin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
   const lum = 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
   return lum > 0.35 ? "#1e293b" : "#fff";
 }
@@ -56,13 +59,19 @@ export default function HeatmapMatrix({
 }) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
+  useEffect(() => {
+    const close = () => setTooltip(null);
+    window.addEventListener("scroll", close, { passive: true });
+    return () => window.removeEventListener("scroll", close);
+  }, []);
+
   const spheres = [...new Set(data.map((d) => d.sphere))].sort();
-  const cycles = [...new Set(data.map((d) => d.cycle))].sort();
-  const lookup = new Map(data.map((d) => [`${d.sphere}|${d.cycle}`, d]));
+  const cycles  = [...new Set(data.map((d) => d.cycle))].sort();
+  const lookup  = new Map(data.map((d) => [`${d.sphere}|${d.cycle}`, d]));
 
   if (!spheres.length) {
     return (
-      <div style={{ padding: "24px 0", textAlign: "center", color: "hsl(var(--muted-foreground))", fontSize: 13 }}>
+      <div style={{ padding: "24px 0", textAlign: "center", color: "hsl(var(--fg-meta))", fontSize: 13 }}>
         Недостаточно данных для отображения
       </div>
     );
@@ -70,14 +79,17 @@ export default function HeatmapMatrix({
 
   const svgW = LABEL_W + cycles.length * CELL_W;
   const svgH = HEADER_H + spheres.length * CELL_H;
-  const minW = cycles.length * 32 + 100;
 
   return (
-    <div style={{ overflowX: "auto", position: "relative" }} onMouseLeave={() => setTooltip(null)}>
+    <div
+      style={{ overflowX: "auto", position: "relative" }}
+      onMouseLeave={() => setTooltip(null)}
+      onTouchStart={() => setTooltip(null)}
+    >
       <svg
-        width={svgW}
-        height={svgH}
-        style={{ minWidth: minW, display: "block" }}
+        viewBox={`0 0 ${svgW} ${svgH}`}
+        style={{ width: "100%", minWidth: svgW, height: "auto", display: "block" }}
+        xmlns="http://www.w3.org/2000/svg"
       >
         {/* Column headers */}
         {cycles.map((cycle, ci) => (
@@ -88,7 +100,7 @@ export default function HeatmapMatrix({
             textAnchor="middle"
             fontSize={10}
             fontWeight={600}
-            fill="#64748b"
+            fill="hsl(var(--fg-meta))"
           >
             {cycle}
           </text>
@@ -100,23 +112,25 @@ export default function HeatmapMatrix({
           const label = sphere.length > 20 ? sphere.slice(0, 18) + "…" : sphere;
           return (
             <g key={sphere}>
+              <title>{sphere}</title>
+
               {/* Row label */}
               <text
                 x={LABEL_W - 8}
                 y={y + CELL_H / 2 + 4}
                 textAnchor="end"
                 fontSize={10}
-                fill="#64748b"
+                fill="hsl(var(--fg-meta))"
               >
                 {label}
               </text>
 
               {/* Cells */}
               {cycles.map((cycle, ci) => {
-                const d = lookup.get(`${sphere}|${cycle}`);
-                const fill = pctFill(d?.pct ?? null);
-                const tColor = d ? textColor(fill) : "#94a3b8";
-                const x = LABEL_W + ci * CELL_W;
+                const d      = lookup.get(`${sphere}|${cycle}`);
+                const fill   = pctFill(d?.pct ?? null);
+                const tColor = d && d.pct !== null ? textColor(fill) : "hsl(var(--fg-dim))";
+                const x      = LABEL_W + ci * CELL_W;
 
                 return (
                   <g
@@ -124,14 +138,15 @@ export default function HeatmapMatrix({
                     style={{ cursor: d && onClickCell ? "pointer" : "default" }}
                     onClick={d && onClickCell ? () => onClickCell(sphere, cycle) : undefined}
                     onMouseMove={(e) =>
-                      d &&
-                      setTooltip({
-                        x: e.clientX,
-                        y: e.clientY,
-                        d,
-                      })
+                      d && setTooltip({ x: e.clientX, y: e.clientY, d })
                     }
                     onMouseLeave={() => setTooltip(null)}
+                    onTouchStart={(e) => {
+                      if (!d) return;
+                      e.stopPropagation();
+                      const t = e.touches[0];
+                      setTooltip({ x: t.clientX, y: t.clientY, d });
+                    }}
                   >
                     <rect
                       x={x + 1}
@@ -139,10 +154,10 @@ export default function HeatmapMatrix({
                       width={CELL_W - 3}
                       height={CELL_H - 3}
                       rx={3}
-                      fill={d ? fill : "#f1f5f9"}
+                      fill={d ? fill : "hsl(var(--bg-elevated))"}
                       opacity={d ? 1 : 0.6}
                     />
-                    {d?.pct !== null && d !== undefined && (
+                    {d && d.pct !== null && (
                       <text
                         x={x + CELL_W / 2}
                         y={y + CELL_H / 2 + 4}
@@ -168,24 +183,24 @@ export default function HeatmapMatrix({
             position: "fixed",
             left: Math.min(tooltip.x + 12, window.innerWidth - 220),
             top: tooltip.y - 48,
-            background: "hsl(var(--card))",
-            border: "1px solid hsl(var(--border))",
+            background: "hsl(var(--bg-card))",
+            border: "1px solid hsl(var(--border-hair))",
             borderRadius: 7,
             padding: "7px 11px",
             fontSize: 12,
             zIndex: 9999,
             pointerEvents: "none",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            boxShadow: "var(--shadow-pop)",
             lineHeight: 1.5,
           }}
         >
-          <div style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>
+          <div style={{ fontWeight: 600, color: "hsl(var(--fg-headline))" }}>
             {tooltip.d.sphere}
           </div>
-          <div style={{ color: "hsl(var(--muted-foreground))" }}>
+          <div style={{ color: "hsl(var(--fg-meta))" }}>
             Цикл {tooltip.d.cycle}
           </div>
-          <div style={{ fontWeight: 700, color: "hsl(var(--foreground))" }}>
+          <div style={{ fontWeight: 700, color: "hsl(var(--fg-body))" }}>
             {tooltip.d.pct}% ({tooltip.d.done} из {tooltip.d.total})
           </div>
         </div>

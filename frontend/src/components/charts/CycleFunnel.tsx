@@ -31,27 +31,24 @@ interface BarRow {
 function FunnelBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
   const pct = total > 0 ? Math.round(count / total * 100) : 0;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 'clamp(70px, 28vw, 130px)', fontSize: 12, color: 'hsl(var(--muted-foreground))', textAlign: 'right', flexShrink: 0, lineHeight: 1.3 }}>
-        {label}
+    <div style={{ marginBottom: 10 }}>
+      <div className="funnel-label-row">
+        <span className="funnel-label">{label}</span>
+        <span className="funnel-val">
+          {count.toLocaleString('ru')}
+          <span className="funnel-pct">{pct}%</span>
+        </span>
       </div>
-      <div style={{ flex: 1, height: 30, background: 'hsl(var(--muted))', borderRadius: 7, overflow: 'hidden', minWidth: 0 }}>
+      <div className="funnel-track">
         <div
+          className="funnel-fill"
           style={{
-            height: '100%',
             width: `${pct}%`,
             background: color,
-            borderRadius: 7,
-            transition: 'width 0.45s ease',
-            minWidth: count > 0 ? 6 : 0,
+            minWidth: count > 0 ? 4 : 0,
+            opacity: count === 0 ? 0.3 : 1,
           }}
         />
-      </div>
-      <div style={{ minWidth: 90, fontSize: 12, fontWeight: 700, color: 'hsl(var(--foreground))', flexShrink: 0 }}>
-        {count.toLocaleString('ru')}
-        <span style={{ fontWeight: 400, color: 'hsl(var(--muted-foreground))', marginLeft: 4 }}>
-          {pct}%
-        </span>
       </div>
     </div>
   );
@@ -94,21 +91,11 @@ export default function CycleFunnel({ cycles }: { cycles: string[] }) {
         </div>
         {cycles.length > 0 && (
           <select
+            className="funnel-select"
+            aria-label="Выбрать цикл"
             value={cycle}
             onChange={e => handleChange(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              minHeight: 36,
-              borderRadius: 7,
-              border: '1px solid hsl(var(--border))',
-              background: 'hsl(var(--background))',
-              color: 'hsl(var(--foreground))',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              opacity: isFetching ? 0.7 : 1,
-              transition: 'opacity 0.15s',
-            }}
+            style={{ opacity: isFetching ? 0.7 : 1, transition: 'opacity 0.15s' }}
           >
             {cycles.map(c => (
               <option key={c} value={c}>Цикл {c}</option>
@@ -124,19 +111,21 @@ export default function CycleFunnel({ cycles }: { cycles: string[] }) {
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[0, 1, 2].map(i => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div className="skeleton" style={{ width: 130, height: 14, borderRadius: 4, flexShrink: 0 }} />
-              <div className="skeleton" style={{ flex: 1, height: 30, borderRadius: 7 }} />
-              <div className="skeleton" style={{ width: 80, height: 14, borderRadius: 4, flexShrink: 0 }} />
+            <div key={i}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div className="skeleton" style={{ width: 100, height: 12, borderRadius: 4 }} />
+                <div className="skeleton" style={{ width: 60, height: 12, borderRadius: 4 }} />
+              </div>
+              <div className="skeleton" style={{ height: 10, borderRadius: 6 }} />
             </div>
           ))}
         </div>
       ) : !data || data.total === 0 ? (
-        <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>
+        <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 13, color: 'hsl(var(--fg-meta))' }}>
           {cycle ? `Нет данных для цикла ${cycle}` : 'Выберите цикл'}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div>
           {rows.map(row => (
             <FunnelBar key={row.label} label={row.label} count={row.count} total={data.total} color={row.color} />
           ))}

@@ -171,33 +171,29 @@ function PartialFilterBadge() {
 function FilterChipBar() {
   const { status, cycle, sphere, setStatus, setCycle, setSphere, reset } = useDashboardFilters();
 
-  type Chip = { key: string; label: string; color: string; onRemove: () => void };
+  type Chip = { key: string; label: string; onRemove: () => void };
   const chips: Chip[] = [
-    status ? { key: "status", label: status, color: STATUS_COLOR_MAP[status], onRemove: () => setStatus(null) } : null,
-    cycle  ? { key: "cycle",  label: `Цикл ${cycle}`, color: "#2563eb", onRemove: () => setCycle(null) } : null,
-    sphere ? { key: "sphere", label: sphere, color: "#7c3aed", onRemove: () => setSphere(null) } : null,
+    status ? { key: "status", label: status,            onRemove: () => setStatus(null) } : null,
+    cycle  ? { key: "cycle",  label: `Цикл ${cycle}`,   onRemove: () => setCycle(null) } : null,
+    sphere ? { key: "sphere", label: sphere,             onRemove: () => setSphere(null) } : null,
   ].filter((c): c is Chip => c !== null);
 
   if (chips.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderRadius: 8, background: "hsl(var(--bg-elevated))", border: "1px solid hsl(var(--border-hair))" }}>
-      <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", fontWeight: 500 }}>Фильтр:</span>
-      {chips.map(({ key, label, color, onRemove }) => (
-        <div key={key} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, background: `${color}18`, border: `1px solid ${color}44` }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "hsl(var(--foreground))" }}>{label}</span>
+    <div className="filter-chip-bar">
+      {chips.map(({ key, label, onRemove }) => (
+        <div key={key} className="filter-chip">
+          <span>{label}</span>
           <button
+            className="filter-chip-close"
             onClick={onRemove}
             aria-label={`Убрать фильтр ${label}`}
-            style={{ width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "hsl(var(--border-div))", cursor: "pointer", flexShrink: 0, fontSize: 11, color: "hsl(var(--fg-secondary))" }}
           >✕</button>
         </div>
       ))}
       {chips.length > 1 && (
-        <button
-          onClick={reset}
-          style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "hsl(var(--muted-foreground))", padding: "0 4px" }}
-        >
+        <button className="filter-chip-reset" onClick={reset}>
           Сбросить всё
         </button>
       )}
@@ -330,23 +326,27 @@ function DashboardInner({
       <SavedViewsBar />
 
       {/* Общий прогресс */}
-      <div className="card" style={{ padding: "14px 20px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 14, color: "hsl(var(--foreground))" }}>Общий прогресс исполнения</span>
-          <span className="data-num" style={{ fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
+      <div className="card progress-card">
+        <div className="progress-header">
+          <span className="progress-header-title">Общий прогресс исполнения</span>
+          <span className="progress-header-stat">
             {stats.totals.done} из {stats.totals.all} · <strong style={{ color: "hsl(var(--status-done))" }}>{overallPct}%</strong>
           </span>
         </div>
-        <div style={{ height: 14, background: "hsl(var(--border))", borderRadius: 8, overflow: "hidden", display: "flex" }}>
+        <div className="progress-bar-track">
           {progressItems.map(({ val, color }) => (
-            <div key={color} style={{ width: `${(val / (stats.totals.all || 1)) * 100}%`, background: color, height: "100%", transition: "width 0.5s" }} />
+            <div
+              key={color}
+              className="progress-bar-segment"
+              style={{ width: `${(val / (stats.totals.all || 1)) * 100}%`, background: color }}
+            />
           ))}
         </div>
-        <div style={{ display: "flex", gap: 18, marginTop: 8, flexWrap: "wrap" }}>
+        <div className="progress-legend">
           {progressItems.map(({ label, val, color }) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 9, height: 9, borderRadius: 2, background: color }} />
-              <span className="data-num" style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>{label}: <strong style={{ color: "hsl(var(--foreground))" }}>{val}</strong></span>
+            <div key={label} className="legend-item">
+              <div className="legend-dot" style={{ background: color }} />
+              {label}: <strong style={{ color: "hsl(var(--fg-body))" }}>{val}</strong>
             </div>
           ))}
         </div>
