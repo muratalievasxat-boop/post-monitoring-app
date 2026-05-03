@@ -58,6 +58,15 @@ const STATUSES = ["Исполнено", "В работе", "Не поддерж�
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function statusClass(status?: string | null): string {
+  const s = (status || "").toLowerCase().trim();
+  if (s === "исполнено") return "done";
+  if (s.startsWith("в работе")) return "work";
+  if (s.includes("снятия с контроля")) return "excluded";
+  if (s.startsWith("не поддерживается")) return "overdue";
+  return "work";
+}
+
 function getStatusColor(status?: string | null): string {
   const s = (status || "").toLowerCase().trim();
   if (s === "исполнено") return "#16a34a";
@@ -131,6 +140,39 @@ function fmtDate(iso: string) {
     + " " + d.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
 }
 
+// ── RegCard ───────────────────────────────────────────────────────────────────
+
+function RegCard({ item, onClick }: { item: Rec; onClick: () => void }) {
+  const sClass = statusClass(item.status_normalized);
+  return (
+    <div
+      className="rec-card"
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+    >
+      <div className="rec-top">
+        {item.cycle && <span className="rec-cycle">Цикл {item.cycle}</span>}
+        <span className={`rec-status ${sClass}`}>
+          {normalizeLabel(item.status_normalized) || "Нет статуса"}
+        </span>
+        {item.due_raw && <span className="rec-due">{item.due_raw}</span>}
+      </div>
+      <div className="rec-text">{item.proposal_text || "—"}</div>
+      <div className="rec-meta">
+        {item.sphere_normalized && <span>{item.sphere_normalized}</span>}
+        {item.sphere_normalized && (item.responsible?.primary || item.responsible_org) && (
+          <span className="rec-meta-dot" />
+        )}
+        {(item.responsible?.primary || item.responsible_org) && (
+          <span>{item.responsible?.primary || item.responsible_org}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface RegistryPageProps {
@@ -176,6 +218,16 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
   const [editAdgs, setEditAdgs] = useState("");
   const [editComment, setEditComment] = useState("");
   const [editBy, setEditBy] = useState("");
+
+  // Mobile breakpoint
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   // Select-all checkbox ref (for indeterminate state)
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -474,145 +526,124 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
         <div className="card error">Не удалось загрузить реестр.</div>
       ) : (
         <>
-          <div className="table-wrap">
-            <table className="data-table data-table-compact">
-              <thead>
-                <tr>
-                  {!isViewer && (
-                    <th style={{ width: 32, padding: "8px 6px" }}>
-                      <input
-                        ref={selectAllRef}
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleSelectAll}
-                        style={{ cursor: "pointer" }}
-                        title={allSelected ? "Снять выбор" : "Выбрать все на странице"}
-                      />
-                    </th>
-                  )}
-                  <th className="col-num">№</th>
-                  <th className="col-cycle">Цикл</th>
-                  <th className="col-sphere">Сфера</th>
-                  <th className="col-proposal">Предложение</th>
-                  <th className="col-org">Отв. орган</th>
-                  <th className="col-deadline">Срок</th>
-                  <th className="col-status">Статус ГО</th>
-                  <th className="col-actions">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(item => (
-                  <tr
-                    key={item.id}
-                    style={overdueFilter ? { background: "rgba(250,204,21,0.13)" } : undefined}
-                  >
-                    {!isViewer && (
-                      <td style={{ padding: "6px 6px" }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(item.id)}
-                          onChange={() => toggleSelect(item.id)}
-                          style={{ cursor: "pointer" }}
-                        />
-                      </td>
-                    )}
-                    <td>{item.seq_no || item.id}</td>
-                    <td>{item.cycle || "—"}</td>
-                    <td>{item.sphere_normalized || "—"}</td>
-                    <td className="proposal-cell">
-                      <div className="proposal-clamp">{item.proposal_text || "—"}</div>
-                    </td>
-                    <td className="org-cell">{item.responsible_org || "—"}</td>
-                    <td>{item.due_raw || "—"}</td>
-                    <td style={{ position: "relative" }}>
-                      <span
-                        style={statusBadgeStyle(item.status_normalized, !isViewer)}
-                        onClick={isViewer ? undefined : e => {
-                          e.stopPropagation();
-                          setOpenDropdown(openDropdown === item.id ? null : item.id);
-                        }}
-                        title={isViewer ? undefined : "Нажмите для изменения статуса"}
-                      >
-                        {normalizeLabel(item.status_normalized) || "Нет статуса"}
-                        {!isViewer && <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>}
-                      </span>
-                      {!isViewer && openDropdown === item.id && (
-                        <div style={{
-                          position: "absolute", top: "calc(100% + 4px)", left: 0,
-                          zIndex: 100,
-                          background: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: 8, padding: 4, minWidth: 210,
-                          boxShadow: "0 4px 20px rgba(0,0,0,0.14)",
-                        }}>
-                          {STATUSES.map(s => (
-                            <div
-                              key={s}
-                              onClick={() => openInlineModal([item.id], s)}
-                              style={{
-                                padding: "5px 8px", cursor: "pointer", borderRadius: 6,
-                                display: "flex", alignItems: "center",
-                              }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "hsl(var(--muted))")}
-                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                            >
-                              <span style={statusBadgeStyle(s)}>{s}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div className="action-row">
-                        <button className="btn-link" onClick={() => setDetailItem(item)}>Подробнее</button>
-                        {!isViewer && <button className="btn-link" onClick={() => openEdit(item)}>Изм.</button>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
+          {isMobile ? (
+            <div className="registry-cards">
+              {rows.length === 0 ? (
+                <div style={{ padding: "24px", textAlign: "center", fontSize: 13, color: "hsl(var(--fg-meta))" }}>
+                  Нет данных для отображения
+                </div>
+              ) : rows.map(item => (
+                <RegCard key={item.id} item={item} onClick={() => setDetailItem(item)} />
+              ))}
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table data-table-compact">
+                <thead>
                   <tr>
-                    <td colSpan={isViewer ? 8 : 9} style={{ textAlign: "center", padding: "24px", color: "#64748b" }}>
-                      Нет данных для отображения
-                    </td>
+                    {!isViewer && (
+                      <th style={{ width: 32, padding: "8px 6px" }}>
+                        <input
+                          ref={selectAllRef}
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleSelectAll}
+                          style={{ cursor: "pointer" }}
+                          title={allSelected ? "Снять выбор" : "Выбрать все на странице"}
+                        />
+                      </th>
+                    )}
+                    <th className="col-num">№</th>
+                    <th className="col-cycle">Цикл</th>
+                    <th className="col-sphere">Сфера</th>
+                    <th className="col-proposal">Предложение</th>
+                    <th className="col-org">Отв. орган</th>
+                    <th className="col-deadline">Срок</th>
+                    <th className="col-status">Статус ГО</th>
+                    <th className="col-actions">Действия</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Mobile card list (hidden on desktop via CSS) ── */}
-          <div className="registry-mobile-cards">
-            {rows.length === 0 ? (
-              <div style={{ padding: "24px", textAlign: "center", fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
-                Нет данных для отображения
-              </div>
-            ) : rows.map(item => (
-              <div key={item.id} className="rec-card" onClick={() => setDetailItem(item)}>
-                <div className="rec-card-top">
-                  {item.cycle && <span className="rec-card-cycle">Цикл {item.cycle}</span>}
-                  <span style={{ ...statusBadgeStyle(item.status_normalized), fontSize: 11, padding: "1px 6px" }}>
-                    {normalizeLabel(item.status_normalized) || "Нет статуса"}
-                  </span>
-                  {item.due_raw && <span className="rec-card-due">{item.due_raw}</span>}
-                </div>
-                <div className="rec-card-proposal">{item.proposal_text || "—"}</div>
-                <div className="rec-card-meta">
-                  {item.sphere_normalized && (
-                    <span className="rec-card-meta-item">{item.sphere_normalized}</span>
+                </thead>
+                <tbody>
+                  {rows.map(item => (
+                    <tr
+                      key={item.id}
+                      style={overdueFilter ? { background: "rgba(250,204,21,0.13)" } : undefined}
+                    >
+                      {!isViewer && (
+                        <td style={{ padding: "6px 6px" }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(item.id)}
+                            onChange={() => toggleSelect(item.id)}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </td>
+                      )}
+                      <td>{item.seq_no || item.id}</td>
+                      <td>{item.cycle || "—"}</td>
+                      <td>{item.sphere_normalized || "—"}</td>
+                      <td className="proposal-cell">
+                        <div className="proposal-clamp">{item.proposal_text || "—"}</div>
+                      </td>
+                      <td className="org-cell">{item.responsible_org || "—"}</td>
+                      <td>{item.due_raw || "—"}</td>
+                      <td style={{ position: "relative" }}>
+                        <span
+                          style={statusBadgeStyle(item.status_normalized, !isViewer)}
+                          onClick={isViewer ? undefined : e => {
+                            e.stopPropagation();
+                            setOpenDropdown(openDropdown === item.id ? null : item.id);
+                          }}
+                          title={isViewer ? undefined : "Нажмите для изменения статуса"}
+                        >
+                          {normalizeLabel(item.status_normalized) || "Нет статуса"}
+                          {!isViewer && <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>}
+                        </span>
+                        {!isViewer && openDropdown === item.id && (
+                          <div style={{
+                            position: "absolute", top: "calc(100% + 4px)", left: 0,
+                            zIndex: 100,
+                            background: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: 8, padding: 4, minWidth: 210,
+                            boxShadow: "0 4px 20px rgba(0,0,0,0.14)",
+                          }}>
+                            {STATUSES.map(s => (
+                              <div
+                                key={s}
+                                onClick={() => openInlineModal([item.id], s)}
+                                style={{
+                                  padding: "5px 8px", cursor: "pointer", borderRadius: 6,
+                                  display: "flex", alignItems: "center",
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = "hsl(var(--muted))")}
+                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                              >
+                                <span style={statusBadgeStyle(s)}>{s}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <div className="action-row">
+                          <button className="btn-link" onClick={() => setDetailItem(item)}>Подробнее</button>
+                          {!isViewer && <button className="btn-link" onClick={() => openEdit(item)}>Изм.</button>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td colSpan={isViewer ? 8 : 9} style={{ textAlign: "center", padding: "24px", color: "#64748b" }}>
+                        Нет данных для отображения
+                      </td>
+                    </tr>
                   )}
-                  {item.sphere_normalized && (item.responsible?.primary || item.responsible_org) && (
-                    <span className="rec-card-meta-dot">·</span>
-                  )}
-                  {(item.responsible?.primary || item.responsible_org) && (
-                    <span className="rec-card-meta-item">
-                      {item.responsible?.primary || item.responsible_org}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="pager">
             <button className="btn-secondary" disabled={currentPage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>

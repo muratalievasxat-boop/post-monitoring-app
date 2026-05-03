@@ -284,19 +284,19 @@ function DashboardInner({
   }, [stats, ct]);
 
   if (isLoading) return (
-    <div className="content" style={{ gap: 16 }}>
+    <div className="dashboard-page">
       <div className="kpi-grid">
         {[0, 1, 2, 3].map(i => <div key={i} className="skeleton" style={{ height: 80, borderRadius: 12 }} />)}
       </div>
       <div className="skeleton" style={{ height: 14, borderRadius: 8 }} />
-      <div className="dashboard-2col">
+      <div className="dashboard-row-2">
         <div className="skeleton" style={{ height: 280, borderRadius: 12 }} />
         <div className="skeleton" style={{ height: 280, borderRadius: 12 }} />
       </div>
     </div>
   );
   if (error || !stats) return (
-    <div className="content">
+    <div className="dashboard-page">
       <ErrorState onRetry={() => refetch()} />
     </div>
   );
@@ -307,8 +307,12 @@ function DashboardInner({
     { label: "Снято с контроля", val: stats.totals.excluded,                              color: "hsl(var(--status-excluded))" },
   ];
 
+  const cycles = (stats.byCycleStatus ?? [])
+    .map(x => x.cycle)
+    .filter(c => c !== 'Без цикла');
+
   return (
-    <div className="content" style={{ gap: 16 }}>
+    <div className="dashboard-page">
 
       {/* KPI */}
       <div className="kpi-grid">
@@ -322,7 +326,7 @@ function DashboardInner({
           selected={status === "Для снятия с контроля"} onClick={() => toggleStatus("Для снятия с контроля")} />
       </div>
 
-      <FilterChipBar />
+      {!!status && <FilterChipBar />}
       <SavedViewsBar />
 
       {/* Общий прогресс */}
@@ -356,11 +360,11 @@ function DashboardInner({
       <TrendCard weeks={12} title="% исполнения, 12 недель" />
 
       {/* Графики по циклам */}
-      <div className="dashboard-2col">
+      <div className="dashboard-row-2">
         <div className="card chart-card">
-          <div className="card-title-row">
+          <div className="card-hd">
             <div className="card-title">Исполнение по циклам</div>
-            <div className="card-meta">{onDrillDown ? "Нажмите на столбец — откроется список рекомендаций" : "Структура статусов"}</div>
+            <div className="card-subtitle">{onDrillDown ? "Нажмите на столбец — откроется список рекомендаций" : "Структура статусов"}</div>
           </div>
           <ChartErrorBoundary>
           <Bar key={`cycle-bar-${status ?? "all"}`} data={cycleStackedData} options={{
@@ -383,9 +387,9 @@ function DashboardInner({
         </div>
 
         <div className="card chart-card">
-          <div className="card-title-row">
+          <div className="card-hd">
             <div className="card-title">% исполнения по циклам</div>
-            <div className="card-meta">{onDrillDown ? "Нажмите на цикл — увидите все рекомендации этого цикла" : "Анализ vs Мониторинг — динамика"}</div>
+            <div className="card-subtitle">{onDrillDown ? "Нажмите на цикл — увидите все рекомендации этого цикла" : "Анализ vs Мониторинг — динамика"}</div>
           </div>
           <ChartErrorBoundary>
           <Line key="line-type-completion" data={cycleLineData} options={{
@@ -408,92 +412,85 @@ function DashboardInner({
         </div>
       </div>
 
-      {/* Воронка цикла — analyst / admin */}
-      {isAnalyst && (() => {
-        const cycles = (stats.byCycleStatus ?? [])
-          .map(x => x.cycle)
-          .filter(c => c !== 'Без цикла');
-        return cycles.length > 0 ? <CycleFunnel cycles={cycles} /> : null;
-      })()}
-
-      {/* Лидеры по сферам + Топ ведомств — analyst / admin */}
+      {/* Analyst / admin sections */}
       {isAnalyst && (
-        <div className="dashboard-2col">
-          <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
-            <div className="card-title-row">
-              <div className="card-title">
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <Trophy size={14} />Лидеры по сферам
-                </span>
+        <>
+          {/* Лидеры по сферам (2/3) + Очередь действий (1/3) */}
+          <div className="dashboard-row-3">
+            <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
+              <div className="card-hd">
+                <div className="card-title">
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <Trophy size={14} />Лидеры по сферам
+                  </span>
+                </div>
+                <div className="card-subtitle" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  по % исполнения
+                  {status && <PartialFilterBadge />}
+                </div>
               </div>
-              <div className="card-meta" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                по % исполнения
-                {status && <PartialFilterBadge />}
-              </div>
+              {(stats.bySphereStatus ?? []).length === 0 ? (
+                <EmptyState icon={BarChart2} title="Нет данных по сферам" />
+              ) : (
+                <ChartErrorBoundary>
+                <HBarChart
+                  labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
+                  values={(stats.bySphereStatus ?? []).map(r => r.pct)}
+                  color={ct.analiz}
+                  onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
+                />
+                </ChartErrorBoundary>
+              )}
             </div>
-            {(stats.bySphereStatus ?? []).length === 0 ? (
-              <EmptyState icon={BarChart2} title="Нет данных по сферам" />
-            ) : (
-              <ChartErrorBoundary>
-              <HBarChart
-                labels={(stats.bySphereStatus ?? []).map(r => r.sphere)}
-                values={(stats.bySphereStatus ?? []).map(r => r.pct)}
-                color={ct.analiz}
-                onClickLabel={onDrillDown ? (label) => onDrillDown({ sphere: label }) : undefined}
-              />
-              </ChartErrorBoundary>
-            )}
-          </div>
-          <div data-filtered={status ? "partial" : undefined}>
-            <RankedOwnersCard
-              onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
-              partialFilter={!!status}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Форма закрытия + Очередь действий — analyst / admin */}
-      {isAnalyst && (
-        <div className="dashboard-2col">
-          <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
-            <div className="card-title-row">
-              <div className="card-title">Форма закрытия</div>
-              <div className="card-meta" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                как закрываются исполненные рекомендации
-                {status && <PartialFilterBadge />}
-              </div>
-            </div>
-            {(stats.byCompletionForm ?? []).length === 0 ? (
-              <EmptyState icon={BarChart2} title="Нет данных по форме закрытия" description="Появятся после накопления исполненных рекомендаций" />
-            ) : (
-              <ChartErrorBoundary>
-              <HBarChart
-                labels={(stats.byCompletionForm ?? []).map(r => r.completion_form)}
-                values={(stats.byCompletionForm ?? []).map(r => r.total)}
-                color={ct.monitoring}
-                isCount
-              />
-              </ChartErrorBoundary>
-            )}
-          </div>
-          <div data-filtered={status ? "partial" : undefined}>
             <ActionQueueCard
               onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
               partialFilter={!!status}
             />
           </div>
-        </div>
-      )}
 
-      {/* Сферы × циклы — analyst / admin */}
-      {isAnalyst && (
-        <div data-filtered={status ? "partial" : undefined}>
+          {/* Топ ведомств (1/2) + Воронка цикла (1/2) */}
+          <div className="dashboard-row-2">
+            <div data-filtered={status ? "partial" : undefined}>
+              <RankedOwnersCard
+                onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
+                partialFilter={!!status}
+              />
+            </div>
+            {cycles.length > 0 && <CycleFunnel cycles={cycles} />}
+          </div>
+
+          {/* Форма закрытия */}
+          <div className="dashboard-row-2">
+            <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
+              <div className="card-hd">
+                <div className="card-title">Форма закрытия</div>
+                <div className="card-subtitle" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  как закрываются исполненные рекомендации
+                  {status && <PartialFilterBadge />}
+                </div>
+              </div>
+              {(stats.byCompletionForm ?? []).length === 0 ? (
+                <EmptyState icon={BarChart2} title="Нет данных по форме закрытия" description="Появятся после накопления исполненных рекомендаций" />
+              ) : (
+                <ChartErrorBoundary>
+                <HBarChart
+                  labels={(stats.byCompletionForm ?? []).map(r => r.completion_form)}
+                  values={(stats.byCompletionForm ?? []).map(r => r.total)}
+                  color={ct.monitoring}
+                  isCount
+                />
+                </ChartErrorBoundary>
+              )}
+            </div>
+            <div />
+          </div>
+
+          {/* Сферы × циклы — полная ширина */}
           <SphereCycleCard
             onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
             partialFilter={!!status}
           />
-        </div>
+        </>
       )}
 
     </div>
