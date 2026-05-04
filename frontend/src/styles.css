@@ -2039,10 +2039,10 @@ button {
   overflow: hidden;
 }
 .kpi-card:hover { border-color: hsl(var(--border-div)); }
-.kpi-card.selected {
-  border-color: hsl(var(--accent));
-  box-shadow: 0 0 0 1px hsl(var(--accent)), 0 0 24px hsl(var(--accent) / 0.12);
-}
+.kpi-card--blue.selected  { border-color: hsl(var(--accent));          box-shadow: 0 0 0 1px hsl(var(--accent) / 0.5),          0 0 20px hsl(var(--accent) / 0.10); }
+.kpi-card--amber.selected { border-color: hsl(var(--status-active));    box-shadow: 0 0 0 1px hsl(var(--status-active) / 0.5),    0 0 20px hsl(var(--status-active) / 0.10); }
+.kpi-card--green.selected { border-color: hsl(var(--status-done));      box-shadow: 0 0 0 1px hsl(var(--status-done) / 0.5),      0 0 20px hsl(var(--status-done) / 0.10); }
+.kpi-card--slate.selected { border-color: hsl(var(--status-excluded));  box-shadow: 0 0 0 1px hsl(var(--status-excluded) / 0.5),  0 0 20px hsl(var(--status-excluded) / 0.10); }
 
 .kpi-card::before {
   content: '';

@@ -13,6 +13,9 @@ export default function SavedViewsBar() {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Скрыть если нет видов и не в режиме сохранения
+  if (views.length === 0 && !saving) return null;
+
   useEffect(() => {
     if (saving) inputRef.current?.focus();
   }, [saving]);
@@ -60,16 +63,9 @@ export default function SavedViewsBar() {
         overflowX: 'auto', padding: '6px 10px',
         borderRadius: 8, border: '1px solid hsl(var(--border))',
         background: 'hsl(var(--background))',
-        // hide scrollbar but keep scroll
         scrollbarWidth: 'none',
       }}
     >
-      {views.length === 0 && !saving && (
-        <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap', flexShrink: 0 }}>
-          Сохранённых видов нет. Настройте фильтры и нажмите «Сохранить вид»
-        </span>
-      )}
-
       {views.map(view => (
         confirmId === view.id ? (
           <div

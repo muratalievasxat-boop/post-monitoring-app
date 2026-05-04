@@ -88,7 +88,7 @@ export default function HeatmapMatrix({
     >
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
-        style={{ width: "100%", minWidth: svgW, height: "auto", display: "block" }}
+        style={{ width: svgW, maxWidth: "100%", height: svgH, display: "block" }}
         xmlns="http://www.w3.org/2000/svg"
       >
         {/* Column headers */}
