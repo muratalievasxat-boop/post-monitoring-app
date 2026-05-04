@@ -77,12 +77,30 @@ function getStatusColor(status?: string | null): string {
 }
 
 function statusBadgeStyle(status?: string | null, clickable = false): React.CSSProperties {
+  const s = (status || "").toLowerCase();
+  const isWork = s.includes("в работе");
+  const isDone = s.includes("исполнено");
+  const isOverdue = s.includes("не поддерживается") && !s.includes("исключ");
+  const isExcluded = s.includes("исключ") || s.includes("снятия с контроля") || s.includes("для снятия");
+
+  const bg = isDone ? "hsl(var(--status-done-soft))"
+    : isWork ? "hsl(var(--status-active-soft))"
+    : isOverdue ? "hsl(var(--status-overdue-soft))"
+    : isExcluded ? "hsl(var(--status-excluded-soft))"
+    : "hsl(var(--bg-elevated))";
+
+  const color = isDone ? "hsl(var(--status-done))"
+    : isWork ? "hsl(var(--status-active))"
+    : isOverdue ? "hsl(var(--status-overdue))"
+    : isExcluded ? "hsl(var(--status-excluded))"
+    : "hsl(var(--fg-meta))";
+
   return {
-    background: getStatusColor(status),
-    color: "#fff",
-    borderRadius: 6,
-    padding: "3px 8px",
-    fontSize: 12,
+    background: bg,
+    color,
+    borderRadius: 999,
+    padding: "3px 10px",
+    fontSize: 11,
     fontWeight: 600,
     cursor: clickable ? "pointer" : "default",
     whiteSpace: "nowrap",
@@ -90,6 +108,9 @@ function statusBadgeStyle(status?: string | null, clickable = false): React.CSSP
     alignItems: "center",
     gap: 3,
     userSelect: "none",
+    maxWidth: 240,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   };
 }
 
