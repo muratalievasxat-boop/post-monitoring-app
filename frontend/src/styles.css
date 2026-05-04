@@ -1581,7 +1581,7 @@ button {
 .data-table-compact .col-proposal { width: 36%; }
 .data-table-compact .col-org { width: 80px; }
 .data-table-compact .col-deadline { width: 70px; }
-.data-table-compact .col-status { width: 150px; }
+.data-table-compact .col-status { width: 220px; }
 .data-table-compact .col-actions { width: 100px; }
 
 .data-table-compact td,
@@ -1635,7 +1635,7 @@ button {
 .data-table-compact .col-proposal { width: 36%; }
 .data-table-compact .col-org { width: 96px; }
 .data-table-compact .col-deadline { width: 80px; }
-.data-table-compact .col-status { width: 170px; }
+.data-table-compact .col-status { width: 220px; }
 .data-table-compact .col-actions { width: 150px; }
 
 .data-table-compact td,
@@ -1713,7 +1713,7 @@ button {
 .registry-card .data-table-compact .col-proposal { width: 36% !important; }
 .registry-card .data-table-compact .col-org { width: 9% !important; }
 .registry-card .data-table-compact .col-deadline { width: 8% !important; }
-.registry-card .data-table-compact .col-status { width: 15% !important; }
+.registry-card .data-table-compact .col-status { width: 220px !important; }
 .registry-card .data-table-compact .col-actions { width: 10% !important; }
 
 .registry-card .data-table th,
@@ -1821,7 +1821,7 @@ button {
 .registry-card .data-table-compact .col-proposal { width: 37% !important; }
 .registry-card .data-table-compact .col-org { width: 8% !important; }
 .registry-card .data-table-compact .col-deadline { width: 7% !important; }
-.registry-card .data-table-compact .col-status { width: 15% !important; }
+.registry-card .data-table-compact .col-status { width: 220px !important; }
 .registry-card .data-table-compact .col-actions { width: 12% !important; }
 
 .registry-card .data-table th,
@@ -3088,7 +3088,7 @@ button {
   border-radius: 999px;
   font-family: var(--font-mono);
   white-space: nowrap;
-  max-width: 160px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
