@@ -589,7 +589,8 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
                       <td>{item.due_raw || "—"}</td>
                       <td style={{ position: "relative" }}>
                         <span
-                          style={statusBadgeStyle(item.status_normalized, !isViewer)}
+                          className={`rec-status ${statusClass(item.status_normalized)}`}
+                          style={{ cursor: !isViewer ? "pointer" : "default", userSelect: "none" }}
                           onClick={isViewer ? undefined : e => {
                             e.stopPropagation();
                             setOpenDropdown(openDropdown === item.id ? null : item.id);
@@ -780,7 +781,7 @@ export default function RegistryPage({ drillDown, onDrillDownApplied, user }: Re
               <div className="record-row">
                 <div className="record-label">Статус ГО</div>
                 <div className="record-value">
-                  <span style={statusBadgeStyle(di.status_normalized)}>
+                  <span className={`rec-status ${statusClass(di.status_normalized)}`}>
                     {normalizeLabel(di.status_normalized) || "—"}
                   </span>
                 </div>

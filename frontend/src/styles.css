@@ -561,6 +561,10 @@ button {
   font-size: 14px;
   font-weight: 600;
   color: hsl(var(--foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .card-meta {
@@ -1491,6 +1495,7 @@ button {
   background: white;
   color: hsl(var(--foreground));
   border: 1px solid hsl(var(--border));
+  border-radius: var(--r-3);
 }
 .btn-primary:disabled,
 .btn-secondary:disabled {
@@ -2558,6 +2563,27 @@ button {
   gap: 8px;
 }
 
+/* ── FIX: CasesDashboard grids ── */
+.cases-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.cases-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 767px) {
+  .cases-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    overflow-x: visible;
+  }
+  .cases-charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── REDESIGN: CycleFunnel ── */
 .funnel-label-row {
   display: flex;
@@ -3054,11 +3080,17 @@ button {
 }
 
 .rec-status {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-family: var(--font-mono);
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rec-status.done {
   background: hsl(var(--status-done-soft));

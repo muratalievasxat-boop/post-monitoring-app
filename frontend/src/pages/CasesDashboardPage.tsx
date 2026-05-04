@@ -200,7 +200,7 @@ export default function CasesDashboardPage() {
     <div className="content" style={{ gap: 16 }}>
 
       {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+      <div className="cases-kpi-grid">
         <KpiCard label="Всего кейсов"     value={totals.total}     color="#2563eb" icon={TrendingUp} />
         <KpiCard label="Принято"           value={totals.accepted}  color="#16a34a" icon={CheckCircle2} />
         <KpiCard label="Отклонено"         value={totals.rejected}  color="#dc2626" icon={XCircle} />
@@ -209,9 +209,9 @@ export default function CasesDashboardPage() {
       </div>
 
       {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+      <div className="cases-charts-row">
         <div className="card chart-card">
-          <div className="card-title-row"><div className="card-title">🏆 Топ ТД по принятым</div></div>
+          <div className="card-title-row"><div className="card-title">🏆 Топ ТД</div></div>
           {topTd.length === 0 ? <div style={{ color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>Нет данных</div>
             : <HBarChart labels={topTd.map(r => r.td_name)} values={topTd.map(r => r.accepted)} color={ct.analiz} />}
         </div>
