@@ -3241,3 +3241,53 @@ button {
 
 /* m5 — dark scrollbar thumb */
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: hsl(217 33% 28%); }
+/* ── REDESIGN: Mobile Dashboard layout ── */
+.mobile-progress-compact {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: hsl(var(--bg-card));
+  border: 1px solid hsl(var(--border-hair));
+  border-radius: var(--r-3);
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--fg-body));
+  font-family: var(--font-mono);
+}
+.mobile-progress-compact strong {
+  color: hsl(var(--status-done));
+  font-weight: 700;
+}
+.mobile-progress-compact .mp-sep {
+  color: hsl(var(--fg-dim));
+}
+.mobile-progress-compact .mp-counts {
+  color: hsl(var(--fg-meta));
+}
+
+@media (max-width: 767px) {
+  /* Hide desktop-only blocks */
+  .trend-card-wrapper      { display: none; }
+  .cycle-charts-row        { display: none; }
+  .heatmap-wrapper         { display: none; }
+  .completion-form-wrapper { display: none; }
+  .sphere-leaders-wrapper  { display: none; }
+
+  /* Compact progress replaces full card */
+  .mobile-progress-compact { display: flex; }
+  .progress-card           { display: none; }
+
+  /* Compact KPI cards — ~80px, no footer placeholder */
+  .kpi-card   { padding: 10px 12px; }
+  .kpi-foot   { display: none; }
+}
+
+/* ── Leaderboard responsive ───────────────────────────────────── */
+.leaderboard-table-wrap { display: block; }
+.leaderboard-cards-wrap { display: none; }
+
+@media (max-width: 767px) {
+  .leaderboard-table-wrap { display: none; }
+  .leaderboard-cards-wrap { display: flex; flex-direction: column; gap: 10px; }
+}

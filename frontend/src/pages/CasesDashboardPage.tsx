@@ -5,8 +5,9 @@ import {
   Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend,
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { TrendingUp, CheckCircle2, XCircle, Clock, RotateCcw, Pencil, Check, X } from 'lucide-react';
+import { TrendingUp, CheckCircle2, XCircle, Clock, RotateCcw, Pencil, Check, X, Trophy } from 'lucide-react';
 import KazakhstanMap, { type TdStat } from '@/components/KazakhstanMap';
+import EmptyState from '@/components/shared/EmptyState';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -19,6 +20,9 @@ interface TdRow {
 }
 interface SphereRow { sphere: string; count: number }
 interface Stats { totals: Totals; byTd: TdRow[]; bySphere: SphereRow[] }
+interface LeaderboardRow {
+  region: string; total: number; accepted: number; rejected: number; pct: number; score: number;
+}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -169,6 +173,96 @@ function TdDetailModal({ tdName, onClose }: { tdName: string; onClose: () => voi
   );
 }
 
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+
+const MEDALS = ['#FFD700', '#C0C0C0', '#CD7F32'] as const;
+
+function Leaderboard() {
+  const { data: rows, isLoading } = useQuery<LeaderboardRow[]>({
+    queryKey: ['/api/cases/leaderboard'],
+    queryFn: async () => {
+      const res = await authFetch('/api/cases/leaderboard');
+      if (!res.ok) throw new Error('err');
+      return res.json();
+    },
+  });
+
+  if (isLoading) return (
+    <div style={{ padding: '24px 0', textAlign: 'center', color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>
+      Загрузка…
+    </div>
+  );
+  if (!rows || rows.length === 0) return <EmptyState icon={Trophy} title="Кейсы ещё не поданы" />;
+
+  return (
+    <>
+      {/* Desktop table */}
+      <div className="leaderboard-table-wrap" style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid hsl(var(--border))' }}>
+              {['#', 'Регион / ТД', 'Подано', 'Принято', '%', 'Балл'].map((h, i) => (
+                <th key={i} style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const medal = MEDALS[i] as string | undefined;
+              const score = Number(row.score);
+              return (
+                <tr key={row.region} style={{ borderBottom: '1px solid hsl(var(--border))', background: medal ? medal + '10' : undefined }}>
+                  <td style={{ padding: '9px 10px', fontWeight: 700, color: medal ?? 'hsl(var(--muted-foreground))', minWidth: 32 }}>
+                    {medal ? <span style={{ fontSize: 16 }}>{['🥇', '🥈', '🥉'][i]}</span> : i + 1}
+                  </td>
+                  <td style={{ padding: '9px 10px', fontWeight: medal ? 700 : 500, color: medal ?? 'hsl(var(--foreground))' }}>{row.region}</td>
+                  <td style={{ padding: '9px 10px', color: 'hsl(var(--muted-foreground))' }}>{row.total}</td>
+                  <td style={{ padding: '9px 10px', color: '#16a34a', fontWeight: 600 }}>{row.accepted}</td>
+                  <td style={{ padding: '9px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ height: 5, width: 52, background: 'hsl(var(--border))', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${row.pct}%`, background: row.pct >= 50 ? '#16a34a' : '#dc2626', borderRadius: 4 }} />
+                      </div>
+                      <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>{row.pct}%</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '9px 10px' }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: medal ?? (score >= 2.0 ? '#16a34a' : score >= 1.0 ? '#d97706' : '#dc2626') }}>
+                      {score.toFixed(2)}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="leaderboard-cards-wrap">
+        {rows.map((row, i) => {
+          const medal = MEDALS[i] as string | undefined;
+          const score = Number(row.score);
+          return (
+            <div key={row.region} style={{ border: `1px solid ${medal ? medal + '55' : 'hsl(var(--border))'}`, borderRadius: 10, padding: '12px 14px', background: medal ? medal + '10' : 'hsl(var(--background))' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 18 }}>{medal ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`}</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: medal ?? 'hsl(var(--foreground))' }}>{row.region}</span>
+                <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 15, color: medal ?? (score >= 2.0 ? '#16a34a' : '#d97706') }}>{score.toFixed(2)} б.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>
+                <span>Подано: <strong style={{ color: 'hsl(var(--foreground))' }}>{row.total}</strong></span>
+                <span>Принято: <strong style={{ color: '#16a34a' }}>{row.accepted}</strong></span>
+                <span>%: <strong style={{ color: 'hsl(var(--foreground))' }}>{row.pct}</strong></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 // ─── CasesDashboardPage ───────────────────────────────────────────────────────
 
 export default function CasesDashboardPage() {
@@ -292,6 +386,17 @@ export default function CasesDashboardPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Leaderboard */}
+      <div className="card" style={{ padding: '16px 20px' }}>
+        <div className="card-title-row" style={{ marginBottom: 14 }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Trophy size={15} />Таблица лидеров
+          </div>
+          <div className="card-meta">Балл = принятые × 0.25</div>
+        </div>
+        <Leaderboard />
       </div>
 
       {detailTd && <TdDetailModal tdName={detailTd} onClose={() => setDetailTd(null)} />}

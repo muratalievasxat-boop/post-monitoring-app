@@ -329,6 +329,13 @@ function DashboardInner({
       {!!status && <FilterChipBar />}
       <SavedViewsBar />
 
+      {/* Компактный прогресс — только мобильный */}
+      <div className="mobile-progress-compact">
+        Прогресс <strong>{overallPct}%</strong>
+        <span className="mp-sep"> · </span>
+        <span className="mp-counts">{stats.totals.done.toLocaleString('ru')} из {stats.totals.all.toLocaleString('ru')}</span>
+      </div>
+
       {/* Общий прогресс */}
       <div className="card progress-card">
         <div className="progress-header">
@@ -356,36 +363,13 @@ function DashboardInner({
         </div>
       </div>
 
-      {/* Тренд исполнения */}
-      <TrendCard weeks={12} title="% исполнения, 12 недель" />
+      {/* Тренд исполнения — только десктоп */}
+      <div className="trend-card-wrapper">
+        <TrendCard weeks={12} title="% исполнения, 12 недель" />
+      </div>
 
-      {/* Графики по циклам */}
-      <div className="dashboard-row-2">
-        <div className="card chart-card">
-          <div className="card-hd">
-            <div className="card-title">Исполнение по циклам</div>
-            <div className="card-subtitle">{onDrillDown ? "Нажмите на столбец — откроется список рекомендаций" : "Структура статусов"}</div>
-          </div>
-          <ChartErrorBoundary>
-          <Bar key={`cycle-bar-${status ?? "all"}`} data={cycleStackedData} options={{
-            responsive: true, maintainAspectRatio: true,
-            onClick: handleCycleChartClick,
-            onHover: (event: any, elements: any[]) => {
-              const canvas = event.native?.target as HTMLCanvasElement;
-              if (canvas) canvas.style.cursor = elements.length && onDrillDown ? "pointer" : "default";
-            },
-            plugins: {
-              legend: { display: true, position: "bottom" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
-              datalabels: { display: false },
-            },
-            scales: {
-              x: { stacked: true, ticks: { color: ct.muted, font: { size: 11 } } },
-              y: { stacked: true, ticks: { color: ct.muted, font: { size: 11 } } },
-            },
-          }} />
-          </ChartErrorBoundary>
-        </div>
-
+      {/* % исполнения по циклам — все роли, только десктоп */}
+      <div className="cycle-charts-row">
         <div className="card chart-card">
           <div className="card-hd">
             <div className="card-title">% исполнения по циклам</div>
@@ -415,9 +399,52 @@ function DashboardInner({
       {/* Analyst / admin sections */}
       {isAnalyst && (
         <>
-          {/* Лидеры по сферам (2/3) + Очередь действий (1/3) */}
+          {/* Row 1: Исполнение по циклам (2fr, desktop) + ActionQueue (1fr) */}
           <div className="dashboard-row-3">
-            <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
+            <div className="card chart-card cycle-charts-row">
+              <div className="card-hd">
+                <div className="card-title">Исполнение по циклам</div>
+                <div className="card-subtitle">{onDrillDown ? "Нажмите на столбец — откроется список рекомендаций" : "Структура статусов"}</div>
+              </div>
+              <ChartErrorBoundary>
+              <Bar key={`cycle-bar-${status ?? "all"}`} data={cycleStackedData} options={{
+                responsive: true, maintainAspectRatio: true,
+                onClick: handleCycleChartClick,
+                onHover: (event: any, elements: any[]) => {
+                  const canvas = event.native?.target as HTMLCanvasElement;
+                  if (canvas) canvas.style.cursor = elements.length && onDrillDown ? "pointer" : "default";
+                },
+                plugins: {
+                  legend: { display: true, position: "bottom" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
+                  datalabels: { display: false },
+                },
+                scales: {
+                  x: { stacked: true, ticks: { color: ct.muted, font: { size: 11 } } },
+                  y: { stacked: true, ticks: { color: ct.muted, font: { size: 11 } } },
+                },
+              }} />
+              </ChartErrorBoundary>
+            </div>
+            <ActionQueueCard
+              onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
+              partialFilter={!!status}
+            />
+          </div>
+
+          {/* Row 2: RankedOwners (1/2) + CycleFunnel (1/2) */}
+          <div className="dashboard-row-2">
+            <div data-filtered={status ? "partial" : undefined}>
+              <RankedOwnersCard
+                onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
+                partialFilter={!!status}
+              />
+            </div>
+            {cycles.length > 0 && <CycleFunnel cycles={cycles} />}
+          </div>
+
+          {/* Row 3: Лидеры по сферам (1/2) + Форма закрытия (1/2) — только десктоп */}
+          <div className="dashboard-row-2">
+            <div className="card chart-card sphere-leaders-wrapper" data-filtered={status ? "partial" : undefined}>
               <div className="card-hd">
                 <div className="card-title">
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -442,26 +469,7 @@ function DashboardInner({
                 </ChartErrorBoundary>
               )}
             </div>
-            <ActionQueueCard
-              onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
-              partialFilter={!!status}
-            />
-          </div>
-
-          {/* Топ ведомств (1/2) + Воронка цикла (1/2) */}
-          <div className="dashboard-row-2">
-            <div data-filtered={status ? "partial" : undefined}>
-              <RankedOwnersCard
-                onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
-                partialFilter={!!status}
-              />
-            </div>
-            {cycles.length > 0 && <CycleFunnel cycles={cycles} />}
-          </div>
-
-          {/* Форма закрытия */}
-          <div className="dashboard-row-2">
-            <div className="card chart-card" data-filtered={status ? "partial" : undefined}>
+            <div className="card chart-card completion-form-wrapper" data-filtered={status ? "partial" : undefined}>
               <div className="card-hd">
                 <div className="card-title">Форма закрытия</div>
                 <div className="card-subtitle" style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -482,14 +490,15 @@ function DashboardInner({
                 </ChartErrorBoundary>
               )}
             </div>
-            <div />
           </div>
 
-          {/* Сферы × циклы — полная ширина */}
-          <SphereCycleCard
-            onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
-            partialFilter={!!status}
-          />
+          {/* Row 4: SphereCycleCard — только десктоп */}
+          <div className="heatmap-wrapper">
+            <SphereCycleCard
+              onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
+              partialFilter={!!status}
+            />
+          </div>
         </>
       )}
 

@@ -65,6 +65,32 @@ router.patch('/td-summary/:td_name', requireRole('admin', 'analyst'), async (req
   }
 });
 
+// GET /api/cases/leaderboard — таблица лидеров по регионам/ТД
+router.get('/leaderboard', requireRole('admin', 'analyst', 'viewer', 'td'), async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.td_name                                                                          AS region,
+        COUNT(*)::int                                                                      AS total,
+        COUNT(*) FILTER (WHERE c.status = 'accepted')::int                                AS accepted,
+        COUNT(*) FILTER (WHERE c.status = 'rejected')::int                                AS rejected,
+        ROUND(COUNT(*) FILTER (WHERE c.status = 'accepted')::numeric
+              / NULLIF(COUNT(*), 0) * 100)::int                                           AS pct,
+        ROUND(COUNT(*) FILTER (WHERE c.status = 'accepted') * 0.25, 2)                   AS score
+      FROM cases c
+      WHERE c.td_name IS NOT NULL
+      GROUP BY c.td_name
+      HAVING COUNT(*) > 0
+      ORDER BY accepted DESC, pct DESC
+      LIMIT 20
+    `);
+    res.json(result.rows);
+  } catch (e) {
+    console.error('GET /cases/leaderboard error:', e.message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // POST /api/cases — создать кейс (td only)
 router.post('/', requireRole('td'), async (req, res) => {
   const { title, sphere, problem, problem_description, solution, npa_refs, measurable_effect } = req.body;
