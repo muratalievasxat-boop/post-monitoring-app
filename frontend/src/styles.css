@@ -2305,6 +2305,7 @@ button {
 
 /* ── REDESIGN: Dashboard layout ── */
 .dashboard-page {
+  width: 100%;
   padding: 20px 24px 40px;
   max-width: 1440px;
   display: flex;
@@ -2356,7 +2357,8 @@ button {
 }
 
 @media (max-width: 767px) {
-  .dashboard-page { padding: 12px 12px 80px; gap: 12px; }
+  .dashboard-page {
+  width: 100%; padding: 12px 12px 80px; gap: 12px; }
 }
 
 /* ── Tablet 768–1023px ─────────────────────────── */
