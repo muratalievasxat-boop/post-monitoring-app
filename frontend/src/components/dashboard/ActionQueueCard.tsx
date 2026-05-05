@@ -30,14 +30,17 @@ const PREVIEW_LIMIT = 5;
 
 export default function ActionQueueCard({
   limit = 20,
+  previewLimit,
   onItemClick,
   partialFilter = false,
 }: {
   limit?: number;
+  previewLimit?: number;
   onItemClick?: (responsible: string) => void;
   partialFilter?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const effectivePreview = previewLimit ?? PREVIEW_LIMIT;
 
   const { data, isLoading } = useQuery<ActionQueueData>({
     queryKey: ["/api/dashboard/action-queue", limit],
@@ -64,7 +67,7 @@ export default function ActionQueueCard({
 
   const { items, summary } = data;
   const isEmpty = items.length === 0;
-  const visibleItems = expanded ? items : items.slice(0, PREVIEW_LIMIT);
+  const visibleItems = expanded ? items : items.slice(0, effectivePreview);
 
   return (
     <div className="card aq-card">
@@ -148,7 +151,7 @@ export default function ActionQueueCard({
             ))}
           </div>
 
-          {items.length > PREVIEW_LIMIT && (
+          {previewLimit === undefined && items.length > PREVIEW_LIMIT && (
             <button className="aq-more" onClick={() => setExpanded((e) => !e)}>
               {expanded ? "Свернуть" : `Показать все ${items.length}`}
             </button>

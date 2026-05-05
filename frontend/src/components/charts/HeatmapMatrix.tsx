@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface HeatmapDatum {
   sphere: string;
@@ -39,10 +39,9 @@ function textColor(rgb: string): string {
   return lum > 0.35 ? "#1e293b" : "#fff";
 }
 
-const CELL_W = 40;
-const CELL_H = 24;
-const LABEL_W = 152;
-const HEADER_H = 30;
+const LABEL_W = 180;
+const CELL_H = 28;
+const HEADER_H = 32;
 
 interface TooltipState {
   x: number;
@@ -57,7 +56,19 @@ export default function HeatmapMatrix({
   data: HeatmapDatum[];
   onClickCell?: (sphere: string, cycle: string) => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const close = () => setTooltip(null);
@@ -77,18 +88,25 @@ export default function HeatmapMatrix({
     );
   }
 
-  const svgW = LABEL_W + cycles.length * CELL_W;
+  const CELL_W = containerWidth > 0 && cycles.length > 0
+    ? Math.floor((containerWidth - LABEL_W) / cycles.length)
+    : 56;
+
+  const svgW = containerWidth > 0 ? containerWidth : LABEL_W + cycles.length * 56;
   const svgH = HEADER_H + spheres.length * CELL_H;
 
   return (
     <div
-      style={{ overflowX: "auto", position: "relative" }}
+      ref={containerRef}
+      style={{ width: "100%", overflowX: CELL_W < 40 ? "auto" : "hidden", position: "relative" }}
       onMouseLeave={() => setTooltip(null)}
       onTouchStart={() => setTooltip(null)}
     >
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
-        style={{ width: svgW, maxWidth: "100%", height: svgH, display: "block" }}
+        width={svgW}
+        height={svgH}
+        style={{ display: "block", width: "100%" }}
         xmlns="http://www.w3.org/2000/svg"
       >
         {/* Column headers */}

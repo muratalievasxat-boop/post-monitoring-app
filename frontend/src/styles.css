@@ -2314,7 +2314,13 @@ button {
 
 .dashboard-row-3 {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 2fr;
+  gap: 14px;
+}
+
+.funnel-queue-col {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 

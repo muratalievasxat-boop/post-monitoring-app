@@ -368,40 +368,42 @@ function DashboardInner({
         <TrendCard weeks={12} title="% исполнения, 12 недель" />
       </div>
 
-      {/* % исполнения по циклам — все роли, только десктоп */}
-      <div className="cycle-charts-row">
-        <div className="card chart-card">
-          <div className="card-hd">
-            <div className="card-title">% исполнения по циклам</div>
-            <div className="card-subtitle">{onDrillDown ? "Нажмите на цикл — увидите все рекомендации этого цикла" : "Анализ vs Мониторинг — динамика"}</div>
+      {/* % исполнения по циклам — только viewer, только десктоп */}
+      {!isAnalyst && (
+        <div className="cycle-charts-row">
+          <div className="card chart-card">
+            <div className="card-hd">
+              <div className="card-title">% исполнения по циклам</div>
+              <div className="card-subtitle">{onDrillDown ? "Нажмите на цикл — увидите все рекомендации этого цикла" : "Анализ vs Мониторинг — динамика"}</div>
+            </div>
+            <ChartErrorBoundary>
+            <Line key="line-type-completion" data={cycleLineData} options={{
+              responsive: true, maintainAspectRatio: true,
+              onClick: handleLineChartClick,
+              onHover: (event: any, elements: any[]) => {
+                const canvas = event.native?.target as HTMLCanvasElement;
+                if (canvas) canvas.style.cursor = elements.length && onDrillDown ? "pointer" : "default";
+              },
+              plugins: {
+                legend: { display: true, position: "bottom" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
+                datalabels: { display: false },
+              },
+              scales: {
+                x: { ticks: { color: ct.muted, font: { size: 11 } } },
+                y: { min: 0, max: 100, ticks: { color: ct.muted, font: { size: 11 }, callback: (v: any) => v + "%" } },
+              },
+            }} />
+            </ChartErrorBoundary>
           </div>
-          <ChartErrorBoundary>
-          <Line key="line-type-completion" data={cycleLineData} options={{
-            responsive: true, maintainAspectRatio: true,
-            onClick: handleLineChartClick,
-            onHover: (event: any, elements: any[]) => {
-              const canvas = event.native?.target as HTMLCanvasElement;
-              if (canvas) canvas.style.cursor = elements.length && onDrillDown ? "pointer" : "default";
-            },
-            plugins: {
-              legend: { display: true, position: "bottom" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
-              datalabels: { display: false },
-            },
-            scales: {
-              x: { ticks: { color: ct.muted, font: { size: 11 } } },
-              y: { min: 0, max: 100, ticks: { color: ct.muted, font: { size: 11 }, callback: (v: any) => v + "%" } },
-            },
-          }} />
-          </ChartErrorBoundary>
         </div>
-      </div>
+      )}
 
       {/* Analyst / admin sections */}
       {isAnalyst && (
         <>
-          {/* Row 1: Исполнение по циклам (2fr, desktop) + ActionQueue (1fr) */}
-          <div className="dashboard-row-3">
-            <div className="card chart-card cycle-charts-row">
+          {/* Row A: Исполнение по циклам (stacked bar) + % исполнения (line) */}
+          <div className="dashboard-row-2 cycle-charts-row">
+            <div className="card chart-card">
               <div className="card-hd">
                 <div className="card-title">Исполнение по циклам</div>
                 <div className="card-subtitle">{onDrillDown ? "Нажмите на столбец — откроется список рекомендаций" : "Структура статусов"}</div>
@@ -425,24 +427,55 @@ function DashboardInner({
               }} />
               </ChartErrorBoundary>
             </div>
-            <ActionQueueCard
-              onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
-              partialFilter={!!status}
-            />
+            <div className="card chart-card">
+              <div className="card-hd">
+                <div className="card-title">% исполнения по циклам</div>
+                <div className="card-subtitle">{onDrillDown ? "Нажмите на цикл — увидите все рекомендации этого цикла" : "Анализ vs Мониторинг — динамика"}</div>
+              </div>
+              <ChartErrorBoundary>
+              <Line key="line-type-completion" data={cycleLineData} options={{
+                responsive: true, maintainAspectRatio: true,
+                onClick: handleLineChartClick,
+                onHover: (event: any, elements: any[]) => {
+                  const canvas = event.native?.target as HTMLCanvasElement;
+                  if (canvas) canvas.style.cursor = elements.length && onDrillDown ? "pointer" : "default";
+                },
+                plugins: {
+                  legend: { display: true, position: "bottom" as const, labels: { color: "#64748b", boxWidth: 10, font: { size: 11 } } },
+                  datalabels: { display: false },
+                },
+                scales: {
+                  x: { ticks: { color: ct.muted, font: { size: 11 } } },
+                  y: { min: 0, max: 100, ticks: { color: ct.muted, font: { size: 11 }, callback: (v: any) => v + "%" } },
+                },
+              }} />
+              </ChartErrorBoundary>
+            </div>
           </div>
 
-          {/* Row 2: RankedOwners (1/2) + CycleFunnel (1/2) */}
-          <div className="dashboard-row-2">
+          {/* Row B: [CycleFunnel + ActionQueue (1fr)] [RankedOwnersCard (2fr)] */}
+          <div className="dashboard-row-3">
+            <div className="funnel-queue-col">
+              {cycles.length > 0 && (
+                <div style={{ maxHeight: 280, overflow: "hidden" }}>
+                  <CycleFunnel cycles={cycles} />
+                </div>
+              )}
+              <ActionQueueCard
+                previewLimit={4}
+                onItemClick={onDrillDown ? (responsible) => onDrillDown({ search: responsible }) : undefined}
+                partialFilter={!!status}
+              />
+            </div>
             <div data-filtered={status ? "partial" : undefined}>
               <RankedOwnersCard
                 onItemClick={onDrillDown ? (org) => onDrillDown({ search: org }) : undefined}
                 partialFilter={!!status}
               />
             </div>
-            {cycles.length > 0 && <CycleFunnel cycles={cycles} />}
           </div>
 
-          {/* Row 3: Лидеры по сферам (1/2) + Форма закрытия (1/2) — только десктоп */}
+          {/* Row C: Лидеры по сферам (1/2) + Форма закрытия (1/2) — только десктоп */}
           <div className="dashboard-row-2">
             <div className="card chart-card sphere-leaders-wrapper" data-filtered={status ? "partial" : undefined}>
               <div className="card-hd">
@@ -492,7 +525,7 @@ function DashboardInner({
             </div>
           </div>
 
-          {/* Row 4: SphereCycleCard — только десктоп */}
+          {/* Row D: SphereCycleCard full width — только десктоп */}
           <div className="heatmap-wrapper">
             <SphereCycleCard
               onClickCell={onDrillDown ? (sphere, cycle) => onDrillDown({ sphere, cycle }) : undefined}
