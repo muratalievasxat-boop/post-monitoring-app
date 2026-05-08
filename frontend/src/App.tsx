@@ -6,6 +6,7 @@ import UpdatePage from './pages/UpdatePage'
 import ExportPage from './pages/ExportPage'
 import CasesPage from './pages/CasesPage'
 import CasesDashboardPage from './pages/CasesDashboardPage'
+import CyclesPage from './pages/CyclesPage'
 import UsersPage from './pages/UsersPage'
 import LoginPage, { type AuthUser } from './pages/LoginPage'
 import { Sidebar, type TabId } from './components/layout/Sidebar'
@@ -88,6 +89,7 @@ export function App() {
     : tab === 'update' ? 'Обновление'
     : tab === 'cases' ? 'Кейсы ТД'
     : tab === 'cases-dashboard' ? 'Аналитика кейсов'
+    : tab === 'cycles' ? 'Циклы кейсов'
     : tab === 'users' ? 'Пользователи'
     : 'Администрирование'
 
@@ -124,6 +126,7 @@ export function App() {
           {tab === 'export' && auth.user.role !== 'td' && <ExportPage />}
           {tab === 'cases' && <CasesPage user={auth.user} />}
           {tab === 'cases-dashboard' && auth.user.role !== 'td' && <CasesDashboardPage />}
+          {tab === 'cycles' && (auth.user.role === 'admin' || auth.user.role === 'analyst') && <CyclesPage />}
           {tab === 'users' && auth.user.role !== 'td' && <UsersPage />}
         </main>
       </section>

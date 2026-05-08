@@ -1,8 +1,8 @@
 import React from 'react';
-import { LayoutDashboard, Table2, RefreshCw, Settings, Briefcase, LogOut, Users, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, Table2, RefreshCw, Settings, Briefcase, LogOut, Users, BarChart2, CalendarRange } from 'lucide-react';
 import type { AuthUser } from '@/pages/LoginPage';
 
-export type TabId = 'dashboard' | 'registry' | 'update' | 'export' | 'cases' | 'users' | 'cases-dashboard';
+export type TabId = 'dashboard' | 'registry' | 'update' | 'export' | 'cases' | 'users' | 'cases-dashboard' | 'cycles';
 
 interface SidebarProps {
   current: TabId;
@@ -82,6 +82,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ current, onChange, user, onLog
               >
                 <BarChart2 size={16} strokeWidth={1.8} />
                 <span>Аналитика кейсов</span>
+              </button>
+            )}
+            {isAnalyst && (
+              <button
+                type="button"
+                className={`sidebar-item${current === 'cycles' ? ' active' : ''}`}
+                onClick={() => onChange('cycles')}
+              >
+                <CalendarRange size={16} strokeWidth={1.8} />
+                <span>Циклы кейсов</span>
               </button>
             )}
             {isAdmin && (

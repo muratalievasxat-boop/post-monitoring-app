@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, Plus, X, MessageSquare, ChevronRight } from 'lucide-react';
+import { Briefcase, Plus, X, MessageSquare, ChevronRight, Paperclip, Download } from 'lucide-react';
 import type { AuthUser } from './LoginPage';
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -30,6 +30,17 @@ interface CaseRow {
   created_at: string;
 }
 
+interface Attachment {
+  id: number;
+  filename: string;
+  mimetype: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+interface CycleRow { id: number; name: string; is_open: boolean }
+interface CategoryRow { id: number; name: string; sort_order: number }
+
 interface CaseDetail extends CaseRow {
   problem: string | null;
   problem_description: string | null;
@@ -38,7 +49,11 @@ interface CaseDetail extends CaseRow {
   measurable_effect: MeasurableEffect | null;
   analyst_comment: string | null;
   submitted_by: number;
+  category_name: string | null;
+  cycle_name: string | null;
+  due_date: string | null;
   comments: Comment[];
+  attachments: Attachment[];
 }
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -156,20 +171,36 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function CreateCaseModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
     title: '', sphere: '', problem: '', problem_description: '',
-    solution: '', npa_refs: '',
+    solution: '', npa_refs: '', category_id: '', due_date: '',
   });
   const [effect, setEffect] = useState<MeasurableEffect>({ type: '', value: '', unit: '', verification: '' });
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const { data: activeCycle, isLoading: cycleLoading } = useQuery<CycleRow | null>({
+    queryKey: ['/api/cases/cycles/active'],
+    queryFn: () => authFetch('/api/cases/cycles/active').then(r => r.json()),
+  });
+
+  const { data: categories = [] } = useQuery<CategoryRow[]>({
+    queryKey: ['/api/cases/categories'],
+    queryFn: () => authFetch('/api/cases/categories').then(r => r.json()),
+  });
+
   function set(k: keyof typeof form) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [k]: e.target.value }));
   }
+
+  function removeFile(i: number) { setFiles(fs => fs.filter((_, j) => j !== i)); }
 
   async function handleSubmit(e: FormEvent, status: 'draft' | 'pending') {
     e.preventDefault();
     if (!form.title.trim()) { setError('Название обязательно'); return; }
+    if (!form.category_id) { setError('Выберите категорию'); return; }
+    if (!form.due_date) { setError('Укажите срок исполнения'); return; }
+    if (form.due_date < new Date().toISOString().split('T')[0]) { setError('Срок не может быть в прошлом'); return; }
     setSaving(true); setError(null);
     try {
       const body: Record<string, unknown> = { ...form, status };
@@ -178,6 +209,18 @@ function CreateCaseModal({ onClose, onCreated }: { onClose: () => void; onCreate
       }
       const res = await authFetch('/api/cases', { method: 'POST', body: JSON.stringify(body) });
       if (!res.ok) { const d = await res.json(); setError(d.error ?? 'Ошибка'); return; }
+      const newCase = await res.json();
+      // Upload files sequentially
+      const token = localStorage.getItem('jwt');
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        await fetch(`/api/cases/${newCase.id}/attachments`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+      }
       onCreated();
       onClose();
     } catch { setError('Ошибка соединения'); }
@@ -194,78 +237,130 @@ function CreateCaseModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'hsl(var(--muted-foreground))', padding: 4 }}><X size={18} /></button>
         </div>
 
-        <form onSubmit={e => handleSubmit(e, 'pending')}>
-          <SectionTitle>Основная информация</SectionTitle>
-          <div style={{ marginBottom: 12 }}>
-            <Label>Название кейса *</Label>
-            <input style={inputStyle()} value={form.title} onChange={set('title')} placeholder="Краткое название инициативы" />
+        {cycleLoading ? (
+          <div style={{ padding: '32px 0', textAlign: 'center', color: 'hsl(var(--muted-foreground))', fontSize: 13 }}>Загрузка...</div>
+        ) : !activeCycle ? (
+          <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🔒</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Приём кейсов закрыт</div>
+            <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>Обратитесь к администратору для открытия нового цикла.</div>
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <Label>Сфера</Label>
-            <input style={inputStyle()} value={form.sphere} onChange={set('sphere')} placeholder="Например: Бизнес, Образование, Здравоохранение..." />
-          </div>
+        ) : (
+          <form onSubmit={e => handleSubmit(e, 'pending')}>
+            <SectionTitle>Основная информация</SectionTitle>
 
-          <SectionTitle>Проблема</SectionTitle>
-          <div style={{ marginBottom: 12 }}>
-            <Label>Суть проблемы (кратко)</Label>
-            <input style={inputStyle()} value={form.problem} onChange={set('problem')} placeholder="Одна фраза о проблеме" />
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <Label>Описание проблемы</Label>
-            <textarea style={inputStyle(true)} value={form.problem_description} onChange={set('problem_description')} placeholder="Подробное описание: кто страдает, как часто, какие последствия..." rows={4} />
-          </div>
-
-          <SectionTitle>Решение</SectionTitle>
-          <div style={{ marginBottom: 12 }}>
-            <Label>Предлагаемое решение</Label>
-            <textarea style={inputStyle(true)} value={form.solution} onChange={set('solution')} placeholder="Что конкретно предлагается изменить..." rows={4} />
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <Label>Ссылки на НПА</Label>
-            <textarea style={inputStyle(true)} value={form.npa_refs} onChange={set('npa_refs')} placeholder="Приказ №..., Постановление №..." rows={2} />
-          </div>
-
-          <SectionTitle>Измеримый эффект</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-            <div>
-              <Label>Тип эффекта</Label>
+            <div style={{ marginBottom: 12 }}>
+              <Label>Цикл</Label>
+              <div className="form-value-readonly">{activeCycle.name}</div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <Label>Категория *</Label>
               <select style={{ ...inputStyle(), appearance: 'auto' } as React.CSSProperties}
-                value={effect.type} onChange={e => setEffect(ef => ({ ...ef, type: e.target.value }))}>
-                <option value="">— выберите —</option>
-                {EFFECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                required value={form.category_id} onChange={set('category_id')}>
+                <option value="">Выберите категорию...</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <Label>Значение</Label>
-                <input style={inputStyle()} type="number" value={effect.value} onChange={e => setEffect(ef => ({ ...ef, value: e.target.value }))} placeholder="1000" />
+            <div style={{ marginBottom: 12 }}>
+              <Label>Название кейса *</Label>
+              <input style={inputStyle()} value={form.title} onChange={set('title')} placeholder="Краткое название инициативы" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <Label>Сфера</Label>
+                <input style={inputStyle()} value={form.sphere} onChange={set('sphere')} placeholder="Бизнес, Образование..." />
               </div>
-              <div style={{ flex: 1 }}>
-                <Label>Единица</Label>
-                <input style={inputStyle()} value={effect.unit} onChange={e => setEffect(ef => ({ ...ef, unit: e.target.value }))} placeholder="часов/год" />
+              <div>
+                <Label>Срок исполнения *</Label>
+                <input style={inputStyle()} type="date" required
+                  min={new Date().toISOString().split('T')[0]}
+                  value={form.due_date} onChange={set('due_date')} />
               </div>
             </div>
-          </div>
-          <div style={{ marginBottom: 20 }}>
-            <Label>Способ верификации</Label>
-            <textarea style={inputStyle(true)} value={effect.verification} onChange={e => setEffect(ef => ({ ...ef, verification: e.target.value }))} placeholder="Как можно проверить достижение эффекта..." rows={2} />
-          </div>
 
-          {error && (
-            <div style={{ fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>{error}</div>
-          )}
+            <SectionTitle>Проблема</SectionTitle>
+            <div style={{ marginBottom: 12 }}>
+              <Label>Суть проблемы (кратко)</Label>
+              <input style={inputStyle()} value={form.problem} onChange={set('problem')} placeholder="Одна фраза о проблеме" />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <Label>Описание проблемы</Label>
+              <textarea style={inputStyle(true)} value={form.problem_description} onChange={set('problem_description')} placeholder="Подробное описание..." rows={4} />
+            </div>
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button type="button" onClick={e => handleSubmit(e as unknown as FormEvent, 'draft')} disabled={saving}
-              style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid hsl(var(--border))', background: 'none', color: 'hsl(var(--foreground))', fontSize: 13, cursor: 'pointer' }}>
-              Сохранить черновик
-            </button>
-            <button type="submit" disabled={saving}
-              style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Отправка...' : 'Отправить на рассмотрение'}
-            </button>
-          </div>
-        </form>
+            <SectionTitle>Решение</SectionTitle>
+            <div style={{ marginBottom: 12 }}>
+              <Label>Предлагаемое решение</Label>
+              <textarea style={inputStyle(true)} value={form.solution} onChange={set('solution')} placeholder="Что конкретно предлагается изменить..." rows={4} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <Label>Ссылки на НПА</Label>
+              <textarea style={inputStyle(true)} value={form.npa_refs} onChange={set('npa_refs')} placeholder="Приказ №..., Постановление №..." rows={2} />
+            </div>
+
+            <SectionTitle>Измеримый эффект</SectionTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <Label>Тип эффекта</Label>
+                <select style={{ ...inputStyle(), appearance: 'auto' } as React.CSSProperties}
+                  value={effect.type} onChange={e => setEffect(ef => ({ ...ef, type: e.target.value }))}>
+                  <option value="">— выберите —</option>
+                  {EFFECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <Label>Значение</Label>
+                  <input style={inputStyle()} type="number" value={effect.value} onChange={e => setEffect(ef => ({ ...ef, value: e.target.value }))} placeholder="1000" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Label>Единица</Label>
+                  <input style={inputStyle()} value={effect.unit} onChange={e => setEffect(ef => ({ ...ef, unit: e.target.value }))} placeholder="часов/год" />
+                </div>
+              </div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <Label>Способ верификации</Label>
+              <textarea style={inputStyle(true)} value={effect.verification} onChange={e => setEffect(ef => ({ ...ef, verification: e.target.value }))} placeholder="Как можно проверить достижение эффекта..." rows={2} />
+            </div>
+
+            <SectionTitle>Документы</SectionTitle>
+            <div style={{ marginBottom: 20 }}>
+              <Label>Подтверждающие файлы (PDF, DOCX, XLSX · до 10 МБ · макс. 5)</Label>
+              <input type="file" multiple
+                accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={e => setFiles(Array.from(e.target.files || []).slice(0, 5))}
+                style={{ fontSize: 12, marginTop: 4 }}
+              />
+              {files.length > 0 && (
+                <div className="file-list">
+                  {files.map((f, i) => (
+                    <div key={i} className="file-item">
+                      <Paperclip size={12} />
+                      <span>{f.name} ({(f.size / 1024 / 1024).toFixed(1)} МБ)</span>
+                      <button type="button" onClick={() => removeFile(i)}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div style={{ fontSize: 13, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>{error}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={e => handleSubmit(e as unknown as FormEvent, 'draft')} disabled={saving}
+                style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid hsl(var(--border))', background: 'none', color: 'hsl(var(--foreground))', fontSize: 13, cursor: 'pointer' }}>
+                Сохранить черновик
+              </button>
+              <button type="submit" disabled={saving}
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Отправка...' : 'Отправить на рассмотрение'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -362,10 +457,47 @@ function CaseDetailModal({ caseId, user, onClose, onUpdated }: {
         ) : c ? (
           <>
             {/* Case fields */}
-            {c.sphere && (
-              <div style={{ marginBottom: 14, padding: '6px 12px', background: 'hsl(var(--muted))', borderRadius: 8, fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>
-                Сфера: <strong style={{ color: 'hsl(var(--foreground))' }}>{c.sphere}</strong>
-              </div>
+            {/* Meta strip */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              {c.cycle_name && (
+                <span style={{ fontSize: 11, padding: '3px 8px', background: 'hsl(var(--muted))', borderRadius: 6, color: 'hsl(var(--muted-foreground))' }}>
+                  🔄 {c.cycle_name}
+                </span>
+              )}
+              {c.category_name && (
+                <span style={{ fontSize: 11, padding: '3px 8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, color: '#1d4ed8' }}>
+                  {c.category_name}
+                </span>
+              )}
+              {c.due_date && (
+                <span style={{ fontSize: 11, padding: '3px 8px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, color: '#92400e' }}>
+                  Срок: {fmtDateShort(c.due_date)}
+                </span>
+              )}
+              {c.sphere && (
+                <span style={{ fontSize: 11, padding: '3px 8px', background: 'hsl(var(--muted))', borderRadius: 6, color: 'hsl(var(--muted-foreground))' }}>
+                  {c.sphere}
+                </span>
+              )}
+            </div>
+
+            {/* Attachments */}
+            {c.attachments?.length > 0 && (
+              <>
+                <SectionTitle>Документы</SectionTitle>
+                <div className="file-list" style={{ marginBottom: 14 }}>
+                  {c.attachments.map(a => (
+                    <div key={a.id} className="file-item">
+                      <Paperclip size={12} />
+                      <span style={{ flex: 1 }}>{a.filename} <span style={{ color: 'hsl(var(--muted-foreground))' }}>({(a.size_bytes / 1024 / 1024).toFixed(1)} МБ)</span></span>
+                      <a href={`/api/cases/attachments/${a.id}/download`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#2563eb', fontSize: 11, textDecoration: 'none' }}>
+                        <Download size={12} />Скачать
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
 
             <SectionTitle>Проблема</SectionTitle>

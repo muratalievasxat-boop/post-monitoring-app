@@ -23,6 +23,8 @@ interface Stats { totals: Totals; byTd: TdRow[]; bySphere: SphereRow[] }
 interface LeaderboardRow {
   region: string; total: number; accepted: number; rejected: number; pct: number; score: number;
 }
+interface CycleRow { id: number; name: string; is_open: boolean }
+interface CategoryRow { id: number; name: string }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -265,15 +267,37 @@ function Leaderboard() {
 
 // ─── CasesDashboardPage ───────────────────────────────────────────────────────
 
+const selectStyle: React.CSSProperties = {
+  padding: '6px 10px', borderRadius: 8, fontSize: 12, border: '1px solid hsl(var(--border))',
+  background: 'hsl(var(--background))', color: 'hsl(var(--foreground))', minWidth: 160,
+};
+
 export default function CasesDashboardPage() {
   const qc = useQueryClient();
   const [detailTd, setDetailTd] = useState<string | null>(null);
+  const [cycleId, setCycleId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const ct = useChartTheme();
 
+  const { data: cycles = [] } = useQuery<CycleRow[]>({
+    queryKey: ['/api/cases/cycles'],
+    queryFn: () => authFetch('/api/cases/cycles').then(r => r.json()),
+  });
+
+  const { data: categories = [] } = useQuery<CategoryRow[]>({
+    queryKey: ['/api/cases/categories'],
+    queryFn: () => authFetch('/api/cases/categories').then(r => r.json()),
+  });
+
+  const statsParams = new URLSearchParams();
+  if (cycleId) statsParams.set('cycle_id', cycleId);
+  if (categoryId) statsParams.set('category_id', categoryId);
+  const statsQs = statsParams.toString() ? `?${statsParams}` : '';
+
   const { data: stats, isLoading } = useQuery<Stats>({
-    queryKey: ['/api/cases/stats'],
+    queryKey: ['/api/cases/stats', cycleId, categoryId],
     queryFn: async () => {
-      const res = await authFetch('/api/cases/stats');
+      const res = await authFetch(`/api/cases/stats${statsQs}`);
       if (!res.ok) throw new Error('Ошибка загрузки');
       return res.json();
     },
@@ -292,6 +316,24 @@ export default function CasesDashboardPage() {
 
   return (
     <div className="content" style={{ gap: 16 }}>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select style={selectStyle} value={cycleId} onChange={e => setCycleId(e.target.value)}>
+          <option value="">Все циклы</option>
+          {cycles.map(c => <option key={c.id} value={c.id}>{c.name}{c.is_open ? ' ✓' : ''}</option>)}
+        </select>
+        <select style={selectStyle} value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+          <option value="">Все категории</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {(cycleId || categoryId) && (
+          <button onClick={() => { setCycleId(''); setCategoryId(''); }}
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid hsl(var(--border))', background: 'none', color: 'hsl(var(--muted-foreground))', fontSize: 12, cursor: 'pointer' }}>
+            Сбросить
+          </button>
+        )}
+      </div>
 
       {/* KPI */}
       <div className="cases-kpi-grid">
@@ -377,7 +419,7 @@ export default function CasesDashboardPage() {
                       <SummaryCell
                         tdName={row.td_name}
                         initial={row.manual_summary}
-                        onSaved={() => qc.invalidateQueries({ queryKey: ['/api/cases/stats'] })}
+                        onSaved={() => qc.invalidateQueries({ queryKey: ['/api/cases/stats', cycleId, categoryId] })}
                       />
                     </td>
                   </tr>
