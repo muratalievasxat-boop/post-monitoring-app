@@ -1,7 +1,10 @@
 import pg from 'pg';
+import 'dotenv/config';
 
 const { Pool } = pg;
 
-export const pool = new Pool({
-  connectionString: 'postgresql://neondb_owner:npg_cwGUTQv53jIB@ep-young-thunder-alshcvp2-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
-});
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
+
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });

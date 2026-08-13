@@ -7,7 +7,10 @@ export function normalizeStatus(value) {
   if (!raw) return { raw, normalized: 'Без статуса', group: 'unknown' };
   if (v.includes('исполн')) return { raw, normalized: 'Исполнено', group: 'done' };
   if (v.includes('в работе')) return { raw, normalized: 'В работе', group: 'active' };
-  if (v.includes('не поддерж')) return { raw, normalized: 'Не поддерживается', group: 'rejected' };
+  if (v.includes('не поддерж') && v.includes('исключ')) {
+    return { raw, normalized: 'Для снятия с контроля', group: 'excluded' };
+  }
+  if (v.includes('не поддерж')) return { raw, normalized: 'Не поддерживается', group: 'active' };
   if (v.includes('исключ')) return { raw, normalized: 'Исключить', group: 'excluded' };
 
   return { raw, normalized: raw, group: 'unknown' };

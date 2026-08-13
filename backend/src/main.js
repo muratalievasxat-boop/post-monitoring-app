@@ -52,7 +52,7 @@ app.get('/api/status-history/recent', async (_req, res) => {
   try {
     const result = await pool.query(`
       select id, record_id, old_status, new_status, comment, changed_at
-      from status_history
+      from public.status_history
       order by changed_at desc
       limit 100
     `);
@@ -83,22 +83,28 @@ if (existsSync(frontendDist)) {
 async function createStatusHistoryTable() {
   try {
     const check = await pool.query(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'status_history' AND column_name = 'old_status'
+      SELECT data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'status_history'
+        AND column_name = 'record_id'
     `);
     if (check.rowCount === 0) {
-      await pool.query(`DROP TABLE IF EXISTS status_history`);
       await pool.query(`
-        CREATE TABLE status_history (
-          id SERIAL PRIMARY KEY,
-          record_id INTEGER NOT NULL,
+        CREATE TABLE public.status_history (
+          id BIGSERIAL PRIMARY KEY,
+          record_id UUID NOT NULL REFERENCES public.recommendations(id) ON DELETE CASCADE,
           old_status TEXT,
           new_status TEXT,
           comment TEXT,
-          changed_at TIMESTAMPTZ DEFAULT now()
+          changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `);
       console.log('[migration] status_history table created');
+    } else if (check.rows[0].data_type !== 'uuid') {
+      throw new Error(
+        'status_history.record_id is not UUID; apply sql/009_public_recommendations_uuid.sql',
+      );
     } else {
       console.log('[migration] status_history table ready');
     }

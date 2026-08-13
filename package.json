@@ -1,6 +1,7 @@
 {
   "name": "post-monitoring-app",
   "private": true,
+  "type": "module",
   "workspaces": [
     "frontend",
     "backend",
@@ -11,6 +12,11 @@
     "setup:frontend": "cd frontend && npm install",
     "setup:worker": "cd import-worker && npm install",
     "setup:all": "npm run setup:backend && npm run setup:frontend && npm run setup:worker",
-    "seed": "node backend/scripts/seed-td-users.js"
+    "seed": "node backend/scripts/seed-td-users.js",
+    "import:recommendations": "node tools/import-xlsx-clean.js"
+  },
+  "dependencies": {
+    "pg": "^8.12.0",
+    "xlsx": "^0.18.5"
   }
 }
